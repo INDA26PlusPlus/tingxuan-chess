@@ -153,7 +153,8 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         }
                     }
                 },
-                PieceType::Knight => { // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
+                PieceType::Knight => { 
+                    // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
                     // as long as it will not go outside the board and the piece there is not black it can go there
                     // DDL
                     if position>15 && position%8!=7 && !matches! (get_piece_at(board, position-15),Some((_,Color::Black))) {                      
@@ -189,7 +190,69 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         moves.push(position+6)
                     }
                 },
-                PieceType::Bishop => {},
+                PieceType::Bishop => {
+                    // current position
+                    let scol = position%8;
+                    let srow = (position-(position%8))/8;
+
+                    // go RD
+                    if position<55 && position%8!=7 {
+                        for i in (position+9..64).step_by(9) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            // usize cant be negative
+                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LD
+                    if position<56 && position%8!=0 {
+                        for i in (position+7..64).step_by(7) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go RU
+                    if position>7 && position%8!=7 {
+                        for j in (7..50).step_by(7) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LU
+                    if position>8 && position%8!=0 {
+                        for j in (9..64).step_by(9) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                },
                 PieceType::Queen => {},
                 PieceType::King => {
                     // go bak
@@ -304,16 +367,16 @@ mod tests {
         let mut chess_board: [Option<Piece>; 64] = [
         Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Queen, color: Color::Black }), Some(Piece { piece_type: PieceType::King, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), 
         Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), 
-        None, None, None, None, None, None, None, None, 
+        Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), None, None, None, None, None, None, None, 
         None, None, None, None, None, None, None, None, 
         None, None, None, None, None, None, None, None, 
         None, None, None, None, None, None, None, None, 
         Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }),
         Some(Piece { piece_type: PieceType::Rook, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Queen, color: Color::White }), Some(Piece { piece_type: PieceType::King, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Rook, color: Color::White }), 
         ];
-        let res = get_piece_at(&chess_board, 0);
+        let res = get_piece_at(&chess_board, 15);
         print!("{:?}",res);
-        let movee = legal_moves(&chess_board,0);
+        let movee = legal_moves(&chess_board,15);
         print!("{:?}",movee)
     }
 }
