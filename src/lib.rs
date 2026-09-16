@@ -62,9 +62,9 @@ impl Game {
 
 }
 
-// new chess board 
+// new chess &board 
 pub fn new_board() -> [Option<Piece>;64] {
-    // board is 1d array, initialize with the chess piece else None in squares
+    // &board is 1d array, initialize with the chess piece else None in squares
     // Some() so Option know it is not None, but Some
     let mut board: [Option<Piece>; 64] = [
     Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Queen, color: Color::Black }), Some(Piece { piece_type: PieceType::King, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), 
@@ -81,7 +81,7 @@ pub fn new_board() -> [Option<Piece>;64] {
 }
 
 // get what chess piece is at a position, return tuple with what piece type and the color
-pub fn get_piece_at(board: &[Option<Piece>;64], position: usize) -> Option<(PieceType,Color)> {
+pub fn get_piece_at(&board: &[Option<Piece>;64], position: usize) -> Option<(PieceType,Color)> {
     if board[position].is_none() {
         return None;
     };
@@ -90,13 +90,13 @@ pub fn get_piece_at(board: &[Option<Piece>;64], position: usize) -> Option<(Piec
     return Some((piecee,colorr));
 }
 
-// check if king is in check
-pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Color) -> bool {
+// check if king is in check, by looking all possible squares where a piece would take it
+pub fn king_in_check(board: [Option<Piece>;64], my_color: Color, opp_color: Color) -> bool {
 
     let mut position = 100;
     // find the king
     for i in 0..64 {
-        if get_piece_at(board, i) == Some((PieceType::King,my_color)) {
+        if get_piece_at(&&board, i) == Some((PieceType::King,my_color)) {
             position = i;
             break
         }
@@ -107,7 +107,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
     // region: rook? (partially queen)
     if position%8!=7 { // right
         for i in position+1..(srow+1)*8 {
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 None => {},
                 Some((PieceType::Rook,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
@@ -117,7 +117,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
     }
     if position%8!=0 { // left
         for i in (srow*8..=position-1).rev() {
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 None => {},
                 Some((PieceType::Rook,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
@@ -127,7 +127,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
     }
     if position<56 { // down
         for i in (position+8..64).step_by(8) {
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 None => {},
                 Some((PieceType::Rook,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
@@ -137,7 +137,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
     }
     if position>7 { // up
         for i in (scol..=position-8).rev().step_by(8) {
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 None => {},
                 Some((PieceType::Rook,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
@@ -148,28 +148,28 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
     // endregion
 
     // region: knight?
-    if position>16 && position%8!=0 && get_piece_at(board, position-17) == Some((PieceType::Knight,opp_color)) {
+    if position>16 && position%8!=0 && get_piece_at(&&board, position-17) == Some((PieceType::Knight,opp_color)) {
         return true
     }
-    if position>14 && position%8!=7 && get_piece_at(board, position-15) == Some((PieceType::Knight,opp_color)) {
+    if position>14 && position%8!=7 && get_piece_at(&&board, position-15) == Some((PieceType::Knight,opp_color)) {
         return true
     }  
-    if position>9 && position%8!=0 && position%8!=1 && get_piece_at(board, position-10) == Some((PieceType::Knight,opp_color)) {
+    if position>9 && position%8!=0 && position%8!=1 && get_piece_at(&&board, position-10) == Some((PieceType::Knight,opp_color)) {
         return true
     }  
-    if position>5 && position%8!=7 && position%8!=6 && get_piece_at(board, position-6) == Some((PieceType::Knight,opp_color)) {
+    if position>5 && position%8!=7 && position%8!=6 && get_piece_at(&&board, position-6) == Some((PieceType::Knight,opp_color)) {
         return true
     }  
-    if position<56 && position%8!=1 && position%8!=0 && get_piece_at(board, position+6) == Some((PieceType::Knight,opp_color)) {
+    if position<56 && position%8!=1 && position%8!=0 && get_piece_at(&&board, position+6) == Some((PieceType::Knight,opp_color)) {
         return true
     }  
-    if position<54 && position%8!=6 && position%8!=7 && get_piece_at(board, position+10) == Some((PieceType::Knight,opp_color)) {
+    if position<54 && position%8!=6 && position%8!=7 && get_piece_at(&&board, position+10) == Some((PieceType::Knight,opp_color)) {
         return true
     }
-    if position<48 && position%8!=0 && get_piece_at(board, position+15) == Some((PieceType::Knight,opp_color)) {
+    if position<48 && position%8!=0 && get_piece_at(&&board, position+15) == Some((PieceType::Knight,opp_color)) {
         return true
     }
-    if position<47 && position%8!=7 && get_piece_at(board, position+17) == Some((PieceType::Knight,opp_color)) {
+    if position<47 && position%8!=7 && get_piece_at(&&board, position+17) == Some((PieceType::Knight,opp_color)) {
         return true
     }
     // endregion 
@@ -180,7 +180,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
             let col = i%8;
             let row = (i-(i%8))/8;
             if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 Some((PieceType::Bishop,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
                 None => {},
@@ -193,7 +193,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
             let col = i%8;
             let row = (i-(i%8))/8;
             if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 Some((PieceType::Bishop,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
                 None => {},
@@ -208,7 +208,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
             let col = i%8;
             let row = (i-(i%8))/8;
             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 Some((PieceType::Bishop,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
                 None => {},
@@ -223,7 +223,7 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
             let col = i%8;
             let row = (i-(i%8))/8;
             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-            match get_piece_at(board, i) {
+            match get_piece_at(&&board, i) {
                 Some((PieceType::Bishop,c)) if c==opp_color => return true,
                 Some((PieceType::Queen,c)) if c==opp_color => return true,
                 None => {},
@@ -235,18 +235,18 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
 
     // region: pawn?
     if my_color == Color::Black && position<56 {
-        if position%8!=0 && get_piece_at(board, position+7) == Some((PieceType::Pawn,Color::White)) {
+        if position%8!=0 && get_piece_at(&board, position+7) == Some((PieceType::Pawn,Color::White)) {
             return true
         }
-        if position%8!=7 && get_piece_at(board, position+9) == Some((PieceType::Pawn,Color::White)) {
+        if position%8!=7 && get_piece_at(&board, position+9) == Some((PieceType::Pawn,Color::White)) {
             return true
         }
     }
     if my_color == Color::White && position>7 {
-        if position%8!=7 && get_piece_at(board, position-7) == Some((PieceType::Pawn,Color::Black)) {
+        if position%8!=7 && get_piece_at(&&board, position-7) == Some((PieceType::Pawn,Color::Black)) {
             return true
         }
-        if position%8!=0 && get_piece_at(board, position-9) == Some((PieceType::Pawn,Color::Black)) {
+        if position%8!=0 && get_piece_at(&board, position-9) == Some((PieceType::Pawn,Color::Black)) {
             return true
         }
     }
@@ -254,19 +254,19 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
     
     // region: king?
     if position%8!=7 {
-        if get_piece_at(board, position+1)==Some((PieceType::King,opp_color)) {return true}
-        if srow!=0 && get_piece_at(board, position-7)==Some((PieceType::King,opp_color)) {return true}
-        if srow!=7 && get_piece_at(board, position+9)==Some((PieceType::King,opp_color)) {return true}
+        if get_piece_at(&&board, position+1)==Some((PieceType::King,opp_color)) {return true}
+        if srow!=0 && get_piece_at(&board, position-7)==Some((PieceType::King,opp_color)) {return true}
+        if srow!=7 && get_piece_at(&&board, position+9)==Some((PieceType::King,opp_color)) {return true}
     }
     
     if position%8!=0 {
-        if get_piece_at(board, position-1)==Some((PieceType::King,opp_color)) {return true}
-        if srow!=0 && get_piece_at(board, position-9)==Some((PieceType::King,opp_color)) {return true}
-        if srow!=7 && get_piece_at(board, position+7)==Some((PieceType::King,opp_color)) {return true}
+        if get_piece_at(&&board, position-1)==Some((PieceType::King,opp_color)) {return true}
+        if srow!=0 && get_piece_at(&board, position-9)==Some((PieceType::King,opp_color)) {return true}
+        if srow!=7 && get_piece_at(&&board, position+7)==Some((PieceType::King,opp_color)) {return true}
     }
 
-    if srow!=0 && get_piece_at(board, position-8)==Some((PieceType::King,opp_color)) {return true}
-    if srow!=7 && get_piece_at(board, position+8)==Some((PieceType::King,opp_color)) {return true}
+    if srow!=0 && get_piece_at(&board, position-8)==Some((PieceType::King,opp_color)) {return true}
+    if srow!=7 && get_piece_at(&&board, position+8)==Some((PieceType::King,opp_color)) {return true}
     // endregion
 
     return false
@@ -274,11 +274,11 @@ pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Col
 
 // return what the legal moves for a piece is
 // unsigned integer, dynamic, array indices is usize
-pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
+pub fn legal_moves(board: [Option<Piece>;64], position: usize) -> Vec<usize> {
     let mut moves = vec![];
     //if get_piece_at gives none then just return empty vector
     //else piece and color are what we got from the function
-    let (piece, color) = match get_piece_at(board, position) {
+    let (piece, color) = match get_piece_at(&board, position) {
         Some(tup) => tup,
         None => return moves
     };
@@ -292,17 +292,8 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 PieceType::Rook => {
                     // go left (right)
                     if position%8!=7 {
-                        for i in position+1..=63 {
-                            if i%8==7 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
-                                    break;
-                                }
-                                else {
-                                    moves.push(i);
-                                    break;
-                                }
-                            }
-                            match get_piece_at(board, i) {
+                        for i in position+1..(srow+1)*8 {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => {break}
@@ -311,17 +302,8 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     }
                     // go right (left)
                     if position%8!=0 {
-                        for i in (0..=position-1).rev() {
-                            if i%8==0 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
-                                    break;
-                                }
-                                else {
-                                    moves.push(i);
-                                    break;
-                                }
-                            }
-                            match get_piece_at(board, i) {
+                        for i in (srow*8..=position-1).rev() {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => {break}
@@ -330,17 +312,8 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     }
                     // go fram (ner)
                     if position<56 {
-                        for i in (position+8..=63).step_by(8) {
-                            if i>56 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
-                                    break;
-                                }
-                                else {
-                                    moves.push(i);
-                                    break;
-                                }
-                            }
-                            match get_piece_at(board, i) {
+                        for i in (position+8..64).step_by(8) {
+                            match get_piece_at(&board, i) {
                             None => moves.push(i),
                             Some((_,Color::White)) => {moves.push(i);break},
                             Some((_,Color::Black)) => {break}
@@ -349,18 +322,8 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     }
                     // go bak (upp)
                     if position>7 {
-                        for j in (8..=63).step_by(8) {
-                            let i = position-j;
-                            if i<8 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
-                                    break;
-                                }
-                                else {
-                                    moves.push(i);
-                                    break;
-                                }
-                            }
-                            match get_piece_at(board, i) {
+                        for i in (scol..=position-8).rev().step_by(8) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => {break}
@@ -370,38 +333,38 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 },
                 PieceType::Knight => { 
                     // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
-                    // as long as it will not go outside the board and the piece there is not black it can go there
+                    // as long as it will not go outside the &board and the piece there is not black it can go there
                     // DDL
-                    if position>15 && position%8!=7 && !matches! (get_piece_at(board, position-15),Some((_,Color::Black))) {                      
+                    if position>15 && position%8!=7 && !matches! (get_piece_at(&board, position-15),Some((_,Color::Black))) {                      
                         moves.push(position-15)   
                     }
                     // DDR
-                    if position>16 && position%8!=0 && !matches! (get_piece_at(board, position-17),Some((_,Color::Black))) {
+                    if position>16 && position%8!=0 && !matches! (get_piece_at(&board, position-17),Some((_,Color::Black))) {
                         moves.push(position-17)
                     }
                     // DLL
-                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(board, position-6),Some((_,Color::Black))) {
+                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position-6),Some((_,Color::Black))) {
                         moves.push(position-6)
                     }
                     // DRR
-                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(board, position-10),Some((_,Color::Black))) {
+                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position-10),Some((_,Color::Black))) {
                         moves.push(position-10)
                     }
 
                     // UUL
-                    if position<47 && position%8!=7 && !matches! (get_piece_at(board, position+17),Some((_,Color::Black))) {
+                    if position<47 && position%8!=7 && !matches! (get_piece_at(&board, position+17),Some((_,Color::Black))) {
                         moves.push(position+17)
                     }
                     // UUR
-                    if position<48 && position%8!=0 && !matches! (get_piece_at(board, position+15),Some((_,Color::Black))) {
+                    if position<48 && position%8!=0 && !matches! (get_piece_at(&board, position+15),Some((_,Color::Black))) {
                         moves.push(position+15)
                     }
                     // ULL
-                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(board, position+10),Some((_,Color::Black))) {
+                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position+10),Some((_,Color::Black))) {
                         moves.push(position+10)
                     }
                     // URR
-                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(board, position+6),Some((_,Color::Black))) {
+                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position+6),Some((_,Color::Black))) {
                         moves.push(position+6)
                     }
                 },
@@ -417,7 +380,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let row = (i-(i%8))/8;
                             // usize cant be negative
                             if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -430,7 +393,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -445,7 +408,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -460,7 +423,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -476,7 +439,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     if position%8!=7 {
                         for i in position+1..=63 {
                             if i%8==7 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                if let Some((_,Color::Black))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -484,7 +447,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => {break}
@@ -495,7 +458,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     if position%8!=0 {
                         for i in (0..=position-1).rev() {
                             if i%8==0 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                if let Some((_,Color::Black))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -503,7 +466,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => {break}
@@ -514,7 +477,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     if position<56 {
                         for i in (position+8..=63).step_by(8) {
                             if i>56 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                if let Some((_,Color::Black))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -522,7 +485,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                             None => moves.push(i),
                             Some((_,Color::White)) => {moves.push(i);break},
                             Some((_,Color::Black)) => {break}
@@ -534,7 +497,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         for j in (8..=63).step_by(8) {
                             let i = position-j;
                             if i<8 {
-                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                if let Some((_,Color::Black))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -542,7 +505,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => {break}
@@ -562,7 +525,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let row = (i-(i%8))/8;
                             // usize cant be negative
                             if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -575,7 +538,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -590,7 +553,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -605,7 +568,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
                                 None => moves.push(i)
@@ -616,7 +579,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 PieceType::King => {
                     // go bak
                     if position>=8 {
-                        match get_piece_at(board, position-8) {
+                        match get_piece_at(&board, position-8) {
                             // if there is no piece or a white piece then it can go there
                             None | Some((_,Color::White)) => moves.push(position-8),
                             _ => {} // everything else, so basically when color is black
@@ -624,21 +587,21 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     }
                     // go fram
                     if position<=55 {
-                        match get_piece_at(board, position+8) {
+                        match get_piece_at(&board, position+8) {
                             None | Some((_,Color::White)) => moves.push(position+8),
                             _ => {} 
                         }
                     }
                     // go right(left)
                     if position%8!=0 {
-                        match get_piece_at(board, position-1) {
+                        match get_piece_at(&board, position-1) {
                             None | Some((_,Color::White)) => moves.push(position-1),
                             _ => {} 
                         }
                     }
                     // go left(right)
                     if position%8!=7 {
-                        match get_piece_at(board, position+1) {
+                        match get_piece_at(&board, position+1) {
                             None | Some((_,Color::White)) => moves.push(position+1),
                             _ => {} 
                         }
@@ -646,28 +609,28 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
 
                     // bak vänster
                     if position>7&&position%8!=7 {
-                        match get_piece_at(board, position-7) {
+                        match get_piece_at(&board, position-7) {
                             None | Some((_,Color::White)) => moves.push(position-7),
                             _ => {} 
                         }
                     }
                     // bak höger
                     if position>7&&position%8!=0 {
-                        match get_piece_at(board, position-9) {
+                        match get_piece_at(&board, position-9) {
                             None | Some((_,Color::White)) => moves.push(position-9),
                             _ => {} 
                         }
                     }
                     // fram vänster
                     if position<56&&position%8!=7 {
-                        match get_piece_at(board, position+9) {
+                        match get_piece_at(&board, position+9) {
                             None | Some((_,Color::White)) => moves.push(position+9),
                             _ => {} 
                         }
                     }
                     // fram höger
                     if position<56&&position%8!=0 {
-                        match get_piece_at(board, position+7) {
+                        match get_piece_at(&board, position+7) {
                             None | Some((_,Color::White)) => moves.push(position+7),
                             _ => {} 
                         }
@@ -675,20 +638,20 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 },
                 PieceType::Pawn => {
                     // two step
-                    if (position>7&&position<16) && get_piece_at(board, position+8).is_none() && get_piece_at(board, position+16).is_none() {
+                    if (position>7&&position<16) && get_piece_at(&board, position+8).is_none() && get_piece_at(&board, position+16).is_none() {
                         moves.push(position+16)
                     }
                     // one step
-                    if position<56 && get_piece_at(board, position+8).is_none() {
+                    if position<56 && get_piece_at(&board, position+8).is_none() {
                         moves.push(position+8)
                     }
 
                     // take another piece, left
-                    if position<56 && position%8!=7 && matches!(get_piece_at(board, position+9),Some((_,Color::White))) {
+                    if position<56 && position%8!=7 && matches!(get_piece_at(&board, position+9),Some((_,Color::White))) {
                         moves.push(position+9)
                     }
                     // take another piece, right
-                    if position<56 && position%8!=0 && matches!(get_piece_at(board, position+7),Some((_,Color::White))) {
+                    if position<56 && position%8!=0 && matches!(get_piece_at(&board, position+7),Some((_,Color::White))) {
                         moves.push(position+7)
                     }
                 }
@@ -700,7 +663,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     // go right
                     if position%8!=7 {
                         for i in position+1..(srow+1)*8 {
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => {break}
@@ -710,7 +673,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     // go left
                     if position%8!=0 {
                         for i in (srow*8..=position-1).rev() {
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => {break}
@@ -720,7 +683,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     // go ner
                     if position<56 {
                         for i in (position+8..64).step_by(8) {
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                             None => moves.push(i),
                             Some((_,Color::Black)) => {moves.push(i);break},
                             Some((_,Color::White)) => {break}
@@ -730,7 +693,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     // go upp
                     if position>7 {
                         for i in (scol..=position-8).rev().step_by(8) {
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => {break}
@@ -740,38 +703,38 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 },
                 PieceType::Knight => { 
                     // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
-                    // as long as it will not go outside the board and the piece there is not white it can go there
+                    // as long as it will not go outside the &board and the piece there is not white it can go there
                     // UUR
-                    if position>15 && position%8!=7 && !matches! (get_piece_at(board, position-15),Some((_,Color::White))) {                      
+                    if position>15 && position%8!=7 && !matches! (get_piece_at(&board, position-15),Some((_,Color::White))) {                      
                         moves.push(position-15)   
                     }
                     // UUL
-                    if position>16 && position%8!=0 && !matches! (get_piece_at(board, position-17),Some((_,Color::White))) {
+                    if position>16 && position%8!=0 && !matches! (get_piece_at(&board, position-17),Some((_,Color::White))) {
                         moves.push(position-17)
                     }
                     // URR
-                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(board, position-6),Some((_,Color::White))) {
+                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position-6),Some((_,Color::White))) {
                         moves.push(position-6)
                     }
                     // ULL
-                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(board, position-10),Some((_,Color::White))) {
+                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position-10),Some((_,Color::White))) {
                         moves.push(position-10)
                     }
 
                     // DDR
-                    if position<47 && position%8!=7 && !matches! (get_piece_at(board, position+17),Some((_,Color::White))) {
+                    if position<47 && position%8!=7 && !matches! (get_piece_at(&board, position+17),Some((_,Color::White))) {
                         moves.push(position+17)
                     }
                     // DDL
-                    if position<48 && position%8!=0 && !matches! (get_piece_at(board, position+15),Some((_,Color::White))) {
+                    if position<48 && position%8!=0 && !matches! (get_piece_at(&board, position+15),Some((_,Color::White))) {
                         moves.push(position+15)
                     }
                     // DRR
-                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(board, position+10),Some((_,Color::White))) {
+                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position+10),Some((_,Color::White))) {
                         moves.push(position+10)
                     }
                     // DLL
-                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(board, position+6),Some((_,Color::White))) {
+                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position+6),Some((_,Color::White))) {
                         moves.push(position+6)
                     }
                 },
@@ -784,7 +747,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let row = (i-(i%8))/8;
                             // usize cant be negative
                             if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -797,7 +760,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -812,7 +775,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -827,7 +790,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -843,7 +806,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     if position%8!=7 {
                         for i in position+1..=63 {
                             if i%8==7 {
-                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                if let Some((_,Color::White))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -851,7 +814,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => {break}
@@ -862,7 +825,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     if position%8!=0 {
                         for i in (0..=position-1).rev() {
                             if i%8==0 {
-                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                if let Some((_,Color::White))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -870,7 +833,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => {break}
@@ -881,7 +844,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     if position<56 {
                         for i in (position+8..=63).step_by(8) {
                             if i>56 {
-                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                if let Some((_,Color::White))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -889,7 +852,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                             None => moves.push(i),
                             Some((_,Color::Black)) => {moves.push(i);break},
                             Some((_,Color::White)) => {break}
@@ -901,7 +864,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         for j in (8..=63).step_by(8) {
                             let i = position-j;
                             if i<8 {
-                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                if let Some((_,Color::White))=get_piece_at(&board, i) {
                                     break;
                                 }
                                 else {
@@ -909,7 +872,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                                     break;
                                 }
                             }
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 None => moves.push(i),
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => {break}
@@ -929,7 +892,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let row = (i-(i%8))/8;
                             // usize cant be negative
                             if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -942,7 +905,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -957,7 +920,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -972,7 +935,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
+                            match get_piece_at(&board, i) {
                                 Some((_,Color::Black)) => {moves.push(i);break},
                                 Some((_,Color::White)) => break,
                                 None => moves.push(i)
@@ -983,7 +946,7 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 PieceType::King => {
                     // go fram
                     if position>=8 {
-                        match get_piece_at(board, position-8) {
+                        match get_piece_at(&board, position-8) {
                             // if there is no piece or a black piece then it can go there
                             None | Some((_,Color::Black)) => moves.push(position-8),
                             _ => {} // everything else, so basically when color is white
@@ -991,21 +954,21 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     }
                     // go bak
                     if position<=55 {
-                        match get_piece_at(board, position+8) {
+                        match get_piece_at(&board, position+8) {
                             None | Some((_,Color::Black)) => moves.push(position+8),
                             _ => {} 
                         }
                     }
                     // go left
                     if position%8!=0 {
-                        match get_piece_at(board, position-1) {
+                        match get_piece_at(&board, position-1) {
                             None | Some((_,Color::Black)) => moves.push(position-1),
                             _ => {} 
                         }
                     }
                     // go right
                     if position%8!=7 {
-                        match get_piece_at(board, position+1) {
+                        match get_piece_at(&board, position+1) {
                             None | Some((_,Color::Black)) => moves.push(position+1),
                             _ => {} 
                         }
@@ -1013,28 +976,28 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
 
                     // bak höger
                     if position>7&&position%8!=7 {
-                        match get_piece_at(board, position-7) {
+                        match get_piece_at(&board, position-7) {
                             None | Some((_,Color::Black)) => moves.push(position-7),
                             _ => {} 
                         }
                     }
                     // bak vänster
                     if position>7&&position%8!=0 {
-                        match get_piece_at(board, position-9) {
+                        match get_piece_at(&board, position-9) {
                             None | Some((_,Color::Black)) => moves.push(position-9),
                             _ => {} 
                         }
                     }
                     // fram höger
                     if position<56&&position%8!=7 {
-                        match get_piece_at(board, position+9) {
+                        match get_piece_at(&board, position+9) {
                             None | Some((_,Color::Black)) => moves.push(position+9),
                             _ => {} 
                         }
                     }
                     // fram vänster
                     if position<56&&position%8!=0 {
-                        match get_piece_at(board, position+7) {
+                        match get_piece_at(&board, position+7) {
                             None | Some((_,Color::Black)) => moves.push(position+7),
                             _ => {} 
                         }
@@ -1042,19 +1005,19 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                 },
                 PieceType::Pawn => {
                     // two step
-                    if (position>47&&position<56) && get_piece_at(board, position-8).is_none() && get_piece_at(board, position-16).is_none() {
+                    if (position>47&&position<56) && get_piece_at(&board, position-8).is_none() && get_piece_at(&board, position-16).is_none() {
                         moves.push(position-16)
                     }
                     // one step
-                    if position>7 && get_piece_at(board, position-8).is_none() {
+                    if position>7 && get_piece_at(&board, position-8).is_none() {
                         moves.push(position-8)
                     }
                     // take another piece, left
-                    if position>7 && position%8!=0 && matches!(get_piece_at(board, position-9),Some((_,Color::Black))) {
+                    if position>7 && position%8!=0 && matches!(get_piece_at(&board, position-9),Some((_,Color::Black))) {
                         moves.push(position-9)
                     }
                     // take another piece, right
-                    if position>7 && position%8!=7 && matches!(get_piece_at(board, position-7),Some((_,Color::Black))) {
+                    if position>7 && position%8!=7 && matches!(get_piece_at(&board, position-7),Some((_,Color::Black))) {
                         moves.push(position-7)
                     }
                 }
@@ -1066,9 +1029,10 @@ pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
 }
 
 // move a piece from a square to another
-pub fn move_piece(from:usize, to:usize, board:&mut[Option<Piece>;64]) {
+pub fn move_piece(from:usize, to:usize, board:&mut[Option<Piece>;64]) -> &mut[Option<Piece>;64] {
     board[to] = board[from];
     board[from] = None;
+    return board
 }
 
 #[cfg(test)]
@@ -1089,7 +1053,7 @@ mod tests {
         ];
         let res = get_piece_at(&chess_board, 15);
         print!("{:?}",res);
-        let movee = legal_moves(&chess_board,15);
+        let movee = legal_moves(chess_board,15);
         print!("{:?}",movee)
     }
 }
