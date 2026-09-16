@@ -1,7 +1,7 @@
-use std::vec;
+use std::{sync::Arc, vec};
 
-#[derive(Debug,PartialEq,Eq)]
-enum PieceType { // difference chess pieces
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub enum PieceType { // difference chess pieces
     King,
     Queen,
     Rook,
@@ -10,23 +10,60 @@ enum PieceType { // difference chess pieces
     Pawn,
 }
 
-#[derive(Debug,PartialEq,Eq)]
-enum Color { // white or black pieces
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub enum Color { // white or black pieces
     White,
     Black,
 }
 
-#[derive(Debug,PartialEq,Eq)]
-struct Piece { 
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub struct Piece { 
     piece_type: PieceType,
     color: Color,
 }
 
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub struct Game {
+    board: [Option<Piece>;64],
+    turn: Color,
+    // if castling has happened
+    r_white_castle: bool,
+    l_white_castle: bool,
+    r_black_castle: bool,
+    l_black_castle: bool,
+    en_passant: Option<usize>,
+}
+
+impl Game {
+    // function to start new game
+    pub fn new() -> Game {
+        Game {
+            board: new_board(),
+            turn: Color::White,
+            // if castling is possible
+            r_white_castle: true,
+            l_white_castle: true,
+            r_black_castle: true,
+            l_black_castle: true,
+            en_passant: None,
+        }
+    }
+
+    pub fn next_turn(&mut self) {
+        if self.turn == Color::Black {
+            self.turn = Color::White
+        }
+        if self.turn == Color::White {
+            self.turn = Color::Black
+        }
+    }
+}
+
 // new chess board 
-fn new_board() {
+pub fn new_board() -> [Option<Piece>;64] {
     // board is 1d array, initialize with the chess piece else None in squares
     // Some() so Option know it is not None, but Some
-    let mut chess_board: [Option<Piece>; 64] = [
+    let mut board: [Option<Piece>; 64] = [
     Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Queen, color: Color::Black }), Some(Piece { piece_type: PieceType::King, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), 
     Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), 
     None, None, None, None, None, None, None, None, 
@@ -37,33 +74,82 @@ fn new_board() {
     Some(Piece { piece_type: PieceType::Rook, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Queen, color: Color::White }), Some(Piece { piece_type: PieceType::King, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Rook, color: Color::White }), 
     ];
 
-    //K king, Q queen, R rook, B bishop, N knight, P pawn
-    println!("{:?}", chess_board);
-    println!("{:?}", chess_board[0].as_ref().unwrap().piece_type); //as a reference, so Rust don't think I want to move it out, unwrap() takes it out of Option()
+    return board
 }
 
 // get what chess piece is at a position, return tuple with what piece type and the color
-fn get_piece_at(board: &[Option<Piece>;64], position: usize) -> Option<(&PieceType,&Color)> {
+pub fn get_piece_at(board: &[Option<Piece>;64], position: usize) -> Option<(PieceType,Color)> {
     if board[position].is_none() {
         return None;
     };
-    let piecee = &board[position].as_ref().unwrap().piece_type;
-    let colorr = &board[position].as_ref().unwrap().color;
+    let piecee = board[position].as_ref().unwrap().piece_type;
+    let colorr = board[position].as_ref().unwrap().color;
     return Some((piecee,colorr));
 }
 
-// check if the square is blocked by a white or black piece
-fn is_blocked(board: &[Option<Piece>;64], position: usize) -> Option<Color>{
-    match get_piece_at(&board, position) {
-        Some((_,Color::White)) => return Some(Color::White),
-        Some((_,Color::Black)) => return Some(Color::Black),
-        None => return None
+// check if king is in check
+pub fn king_in_check(board: &[Option<Piece>;64], my_color: Color, opp_color: Color) -> bool {
+
+    let mut position = 0;
+    // find the king
+    for i in 0..64 {
+        if get_piece_at(board, i) == Some((PieceType::King,my_color)) {
+            position = i;
+            break
+        }
     }
+
+    // region: any rook? (partially queen)
+
+    let scol = position%8;
+    let srow = (position-(position%8))/8;
+    for j in (scol..64).step_by(8) { // vertical
+        if get_piece_at(board, j) == Some((PieceType::Rook,opp_color)) || get_piece_at(board, j) == Some((PieceType::Queen,opp_color)) {
+            return false
+        }
+    }
+    for j in srow/8..srow/8+8 { //horizontal
+        if get_piece_at(board, j) == Some((PieceType::Rook,opp_color)) || get_piece_at(board, j) == Some((PieceType::Queen,opp_color)) {
+            return false
+        }
+    }
+    // endregion
+
+    // region: any knight?
+    if position>16 && position%8!=0 && get_piece_at(board, position-17) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }
+    if position>14 && position%8!=7 && get_piece_at(board, position-15) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }  
+    if position>9 && position%8!=0 && position%8!=1 && get_piece_at(board, position-10) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }  
+    if position>5 && position%8!=7 && position%8!=6 && get_piece_at(board, position-6) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }  
+    if position<56 && position%8!=1 && position%8!=0 && get_piece_at(board, position+6) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }  
+    if position<54 && position%8!=6 && position%8!=7 && get_piece_at(board, position+10) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }
+    if position<48 && position%8!=0 && get_piece_at(board, position+15) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }
+    if position<47 && position%8!=7 && get_piece_at(board, position+17) == Some((PieceType::Knight,opp_color)) {
+        return false
+    }
+    // endregion 
+    
+    // region: any bishop? (partially queen)
+    
+    return true
 }
 
 // return what the legal moves for a piece is
 // unsigned integer, dynamic, array indices is usize
-fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
+pub fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
     let mut moves = vec![];
     //if get_piece_at gives none then just return empty vector
     //else piece and color are what we got from the function
@@ -117,7 +203,7 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     // go fram (ner)
                     if position<56 {
                         for i in (position+8..=63).step_by(8) {
-                            if i>55 {
+                            if i>56 {
                                 if let Some((_,Color::Black))=get_piece_at(board, i) {
                                     break;
                                 }
@@ -134,9 +220,10 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         }
                     }
                     // go bak (upp)
-                    if position<8 {
-                        for i in (position+8..=63).step_by(8) {
-                            if i>55 {
+                    if position>7 {
+                        for j in (8..=63).step_by(8) {
+                            let i = position-j;
+                            if i<8 {
                                 if let Some((_,Color::Black))=get_piece_at(board, i) {
                                     break;
                                 }
@@ -195,26 +282,13 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     let scol = position%8;
                     let srow = (position-(position%8))/8;
 
-                    // go RD
+                    // go LU
                     if position<55 && position%8!=7 {
                         for i in (position+9..64).step_by(9) {
                             let col = i%8;
                             let row = (i-(i%8))/8;
                             // usize cant be negative
-                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
-                            match get_piece_at(board, i) {
-                                Some((_,Color::White)) => {moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => moves.push(i)
-                            }
-                        }
-                    }
-                    // go LD
-                    if position<56 && position%8!=0 {
-                        for i in (position+7..64).step_by(7) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
                             match get_piece_at(board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
@@ -223,13 +297,11 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         }
                     }
                     // go RU
-                    if position>7 && position%8!=7 {
-                        for j in (7..50).step_by(7) {
-                            if j>position {break}
-                            let i = position-j;
+                    if position<56 && position%8!=0 {
+                        for i in (position+7..64).step_by(7) {
                             let col = i%8;
                             let row = (i-(i%8))/8;
-                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
                             match get_piece_at(board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
@@ -237,14 +309,29 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                             }
                         }
                     }
-                    // go LU
+                    // go LD
+                    if position>7 && position%8!=7 {
+                        for j in (7..50).step_by(7) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go RD
                     if position>8 && position%8!=0 {
                         for j in (9..64).step_by(9) {
                             if j>position {break}
                             let i = position-j;
                             let col = i%8;
                             let row = (i-(i%8))/8;
-                            if (col as isize - scol as isize).abs() != (row as isize -srow as isize).abs() {break}
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
                             match get_piece_at(board, i) {
                                 Some((_,Color::White)) => {moves.push(i);break},
                                 Some((_,Color::Black)) => break,
@@ -253,7 +340,151 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                         }
                     }
                 },
-                PieceType::Queen => {},
+                PieceType::Queen => {
+                    // queen is basically rook and bishop
+
+                    // rook
+                    // go left (right)
+                    if position%8!=7 {
+                        for i in position+1..=63 {
+                            if i%8==7 {
+                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => {break}
+                            }
+                        }
+                    }
+                    // go right (left)
+                    if position%8!=0 {
+                        for i in (0..=position-1).rev() {
+                            if i%8==0 {
+                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => {break}
+                            }
+                        }
+                    }
+                    // go fram (ner)
+                    if position<56 {
+                        for i in (position+8..=63).step_by(8) {
+                            if i>56 {
+                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                            None => moves.push(i),
+                            Some((_,Color::White)) => {moves.push(i);break},
+                            Some((_,Color::Black)) => {break}
+                            }
+                        }
+                    }
+                    // go bak (upp)
+                    if position>7 {
+                        for j in (8..=63).step_by(8) {
+                            let i = position-j;
+                            if i<8 {
+                                if let Some((_,Color::Black))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => {break}
+                            }
+                        }
+                    }
+                    
+                    // bishop
+                    // current position
+                    let scol = position%8;
+                    let srow = (position-(position%8))/8;
+
+                    // go LU
+                    if position<55 && position%8!=7 {
+                        for i in (position+9..64).step_by(9) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            // usize cant be negative
+                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go RU
+                    if position<56 && position%8!=0 {
+                        for i in (position+7..64).step_by(7) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LD
+                    if position>7 && position%8!=7 {
+                        for j in (7..50).step_by(7) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go RD
+                    if position>8 && position%8!=0 {
+                        for j in (9..64).step_by(9) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::White)) => {moves.push(i);break},
+                                Some((_,Color::Black)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                },
                 PieceType::King => {
                     // go bak
                     if position>=8 {
@@ -315,36 +546,430 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
                     }
                 },
                 PieceType::Pawn => {
-                    if (position<=49) && get_piece_at(board, position+8).is_none() {
+                    // two step
+                    if (position>7&&position<16) && get_piece_at(board, position+8).is_none() && get_piece_at(board, position+16).is_none() {
+                        moves.push(position+16)
+                    }
+                    // one step
+                    if position<56 && get_piece_at(board, position+8).is_none() {
                         moves.push(position+8)
                     }
-                    if (position>=8&&position<=15) && (get_piece_at(board, position+8).is_none()) {
-                        moves.push(position+8*2)
+
+                    // take another piece, left
+                    if position<56 && position%8!=7 && matches!(get_piece_at(board, position+9),Some((_,Color::White))) {
+                        moves.push(position+9)
                     }
-                    if position<55&&position%8!=7 {
-                        // less code than match
-                        // if get_piece_at returns a Some where the color is white
-                        if let Some((_,Color::White)) = get_piece_at(board, position+9) {
-                            moves.push(position+9)
-                        }    
-                    }
-                    if position<=55&&position%8!=0 {
-                        if let Some((_,Color::White)) = get_piece_at(board, position+7) {
-                            moves.push(position+7)
-                        }
+                    // take another piece, right
+                    if position<56 && position%8!=0 && matches!(get_piece_at(board, position+7),Some((_,Color::White))) {
+                        moves.push(position+7)
                     }
                 }
             }
         }
         Color::White => {
-            match piece {
-                PieceType::Rook => {},
-                PieceType::Knight => {},
-                PieceType::Bishop => {},
-                PieceType::Queen => {},
-                PieceType::King => {},
-                PieceType::Pawn => {}
+            match piece { // for each piece it has different possible moves
+                PieceType::Rook => {
+                    // go right
+                    if position%8!=7 {
+                        for i in position+1..=63 {
+                            if i%8==7 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    // go left
+                    if position%8!=0 {
+                        for i in (0..=position-1).rev() {
+                            if i%8==0 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    // go ner
+                    if position<56 {
+                        for i in (position+8..=63).step_by(8) {
+                            if i>56 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                            None => moves.push(i),
+                            Some((_,Color::Black)) => {moves.push(i);break},
+                            Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    // go upp
+                    if position>7 {
+                        for j in (8..=63).step_by(8) {
+                            let i = position-j;
+                            if i<8 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                },
+                PieceType::Knight => { 
+                    // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
+                    // as long as it will not go outside the board and the piece there is not white it can go there
+                    // UUR
+                    if position>15 && position%8!=7 && !matches! (get_piece_at(board, position-15),Some((_,Color::White))) {                      
+                        moves.push(position-15)   
+                    }
+                    // UUL
+                    if position>16 && position%8!=0 && !matches! (get_piece_at(board, position-17),Some((_,Color::White))) {
+                        moves.push(position-17)
+                    }
+                    // URR
+                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(board, position-6),Some((_,Color::White))) {
+                        moves.push(position-6)
+                    }
+                    // ULL
+                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(board, position-10),Some((_,Color::White))) {
+                        moves.push(position-10)
+                    }
 
+                    // DDR
+                    if position<47 && position%8!=7 && !matches! (get_piece_at(board, position+17),Some((_,Color::White))) {
+                        moves.push(position+17)
+                    }
+                    // DDL
+                    if position<48 && position%8!=0 && !matches! (get_piece_at(board, position+15),Some((_,Color::White))) {
+                        moves.push(position+15)
+                    }
+                    // DRR
+                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(board, position+10),Some((_,Color::White))) {
+                        moves.push(position+10)
+                    }
+                    // DLL
+                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(board, position+6),Some((_,Color::White))) {
+                        moves.push(position+6)
+                    }
+                },
+                PieceType::Bishop => {
+                    // current position
+                    let scol = position%8;
+                    let srow = (position-(position%8))/8;
+
+                    // go RD
+                    if position<55 && position%8!=7 {
+                        for i in (position+9..64).step_by(9) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            // usize cant be negative
+                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LD
+                    if position<56 && position%8!=0 {
+                        for i in (position+7..64).step_by(7) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go RU
+                    if position>7 && position%8!=7 {
+                        for j in (7..50).step_by(7) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LU
+                    if position>8 && position%8!=0 {
+                        for j in (9..64).step_by(9) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                },
+                PieceType::Queen => {
+                    // queen is basically rook and bishop
+
+                    // rook
+                    // go right
+                    if position%8!=7 {
+                        for i in position+1..=63 {
+                            if i%8==7 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    // go left
+                    if position%8!=0 {
+                        for i in (0..=position-1).rev() {
+                            if i%8==0 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    // go ner
+                    if position<56 {
+                        for i in (position+8..=63).step_by(8) {
+                            if i>56 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                            None => moves.push(i),
+                            Some((_,Color::Black)) => {moves.push(i);break},
+                            Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    // go upp
+                    if position>7 {
+                        for j in (8..=63).step_by(8) {
+                            let i = position-j;
+                            if i<8 {
+                                if let Some((_,Color::White))=get_piece_at(board, i) {
+                                    break;
+                                }
+                                else {
+                                    moves.push(i);
+                                    break;
+                                }
+                            }
+                            match get_piece_at(board, i) {
+                                None => moves.push(i),
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => {break}
+                            }
+                        }
+                    }
+                    
+                    // bishop
+                    // current position
+                    let scol = position%8;
+                    let srow = (position-(position%8))/8;
+
+                    // go RD
+                    if position<55 && position%8!=7 {
+                        for i in (position+9..64).step_by(9) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            // usize cant be negative
+                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LD
+                    if position<56 && position%8!=0 {
+                        for i in (position+7..64).step_by(7) {
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go RU
+                    if position>7 && position%8!=7 {
+                        for j in (7..50).step_by(7) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                    // go LU
+                    if position>8 && position%8!=0 {
+                        for j in (9..64).step_by(9) {
+                            if j>position {break}
+                            let i = position-j;
+                            let col = i%8;
+                            let row = (i-(i%8))/8;
+                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                            match get_piece_at(board, i) {
+                                Some((_,Color::Black)) => {moves.push(i);break},
+                                Some((_,Color::White)) => break,
+                                None => moves.push(i)
+                            }
+                        }
+                    }
+                },
+                PieceType::King => {
+                    // go fram
+                    if position>=8 {
+                        match get_piece_at(board, position-8) {
+                            // if there is no piece or a black piece then it can go there
+                            None | Some((_,Color::Black)) => moves.push(position-8),
+                            _ => {} // everything else, so basically when color is white
+                        }
+                    }
+                    // go bak
+                    if position<=55 {
+                        match get_piece_at(board, position+8) {
+                            None | Some((_,Color::Black)) => moves.push(position+8),
+                            _ => {} 
+                        }
+                    }
+                    // go left
+                    if position%8!=0 {
+                        match get_piece_at(board, position-1) {
+                            None | Some((_,Color::Black)) => moves.push(position-1),
+                            _ => {} 
+                        }
+                    }
+                    // go right
+                    if position%8!=7 {
+                        match get_piece_at(board, position+1) {
+                            None | Some((_,Color::Black)) => moves.push(position+1),
+                            _ => {} 
+                        }
+                    }
+
+                    // bak höger
+                    if position>7&&position%8!=7 {
+                        match get_piece_at(board, position-7) {
+                            None | Some((_,Color::Black)) => moves.push(position-7),
+                            _ => {} 
+                        }
+                    }
+                    // bak vänster
+                    if position>7&&position%8!=0 {
+                        match get_piece_at(board, position-9) {
+                            None | Some((_,Color::Black)) => moves.push(position-9),
+                            _ => {} 
+                        }
+                    }
+                    // fram höger
+                    if position<56&&position%8!=7 {
+                        match get_piece_at(board, position+9) {
+                            None | Some((_,Color::Black)) => moves.push(position+9),
+                            _ => {} 
+                        }
+                    }
+                    // fram vänster
+                    if position<56&&position%8!=0 {
+                        match get_piece_at(board, position+7) {
+                            None | Some((_,Color::Black)) => moves.push(position+7),
+                            _ => {} 
+                        }
+                    }
+                },
+                PieceType::Pawn => {
+                    // two step
+                    if (position>47&&position<56) && get_piece_at(board, position-8).is_none() && get_piece_at(board, position-16).is_none() {
+                        moves.push(position-16)
+                    }
+                    // one step
+                    if position>7 && get_piece_at(board, position-8).is_none() {
+                        moves.push(position-8)
+                    }
+                    // take another piece, left
+                    if position>7 && position%8!=0 && matches!(get_piece_at(board, position-9),Some((_,Color::Black))) {
+                        moves.push(position-9)
+                    }
+                    // take another piece, right
+                    if position>7 && position%8!=7 && matches!(get_piece_at(board, position-7),Some((_,Color::Black))) {
+                        moves.push(position-7)
+                    }
+                }
             }
         }
     
@@ -353,8 +978,9 @@ fn legal_moves(board: &[Option<Piece>;64], position: usize) -> Vec<usize> {
 }
 
 // move a piece from a square to another
-fn move_piece(from: usize, to:usize) {
-
+pub fn move_piece(from:usize, to:usize, board:&mut[Option<Piece>;64]) {
+    board[to] = board[from];
+    board[from] = None;
 }
 
 #[cfg(test)]
@@ -363,7 +989,6 @@ mod tests {
 
     #[test]
     fn test(){
-
         let mut chess_board: [Option<Piece>; 64] = [
         Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Queen, color: Color::Black }), Some(Piece { piece_type: PieceType::King, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), 
         Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), 
