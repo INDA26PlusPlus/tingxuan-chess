@@ -15,6 +15,12 @@ pub enum Color { // white or black pieces
 }
 
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub enum Error { // white or black pieces
+    IllegalMove,
+    OutOfBound,
+}
+
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
 pub struct Piece { 
     piece_type: PieceType,
     color: Color,
@@ -24,6 +30,7 @@ pub struct Piece {
 pub struct Chess {
     board: [Option<Piece>;64],
     turn: Color,
+    opposite: Color,
     // if castling has happened
     r_white_castle: bool,
     l_white_castle: bool,
@@ -38,6 +45,7 @@ impl Chess {
         Chess {
             board: new_board(),
             turn: Color::White,
+            opposite: Color::Black,
             // if castling is possible
             r_white_castle: true,
             l_white_castle: true,
@@ -49,15 +57,845 @@ impl Chess {
 
     pub fn next_turn(&mut self) {
         if self.turn == Color::Black {
-            self.turn = Color::White
+            self.turn = Color::White;
+            self.opposite = Color::Black
         }
         else {
-            self.turn = Color::Black
+            self.turn = Color::Black;
+            self.opposite = Color::White
         }
     }
+    
+    // move a piece from a square to another
+    pub fn move_piece(&mut self, from:usize, to:usize) -> Result<(), Error>{
+        // check so this is a legal move
+        if is_move_legal(&mut self.board,from,to,self.turn,self.opposite)==true && self.legal_moves(from).contains(&to)  {
+            // if the piece moved is a king or rook then castling cannot happen anymore, or castling happen
+            if get_piece_at(&self.board, from) == Some((PieceType::King,self.turn)) {
+                if from==60 && to==62 {
+                    self.board[61] = self.board[63];
+                    self.board[63] = None;
+                }
+                else if from==60 && to==58 {
+                    self.board[59] = self.board[56];
+                    self.board[56] = None;
+                }
+                else if from==4 && to==6 {
+                    self.board[5] = self.board[7];
+                    self.board[7] = None;
+                }
+                else if from==4 && to==2 {
+                    self.board[3] = self.board[0];
+                    self.board[0] = None;
+                }
 
-    pub fn current_turn(&self) -> Color {
-        self.turn
+                if self.turn == Color::Black {self.r_black_castle=false;self.l_black_castle=false}
+                else {self.r_white_castle=false;self.l_white_castle=false}
+            }
+            else if get_piece_at(&self.board, from) == Some((PieceType::Rook,self.turn)) {
+                if from==56 {self.l_white_castle=false}
+                else if from==63 {self.r_white_castle=false}
+                else if from==7 {self.l_black_castle=false}
+                else if from==0 {self.r_black_castle=false}
+            }
+            // if a rook is captured then castling cannot happen
+            if get_piece_at(&self.board, to) == Some((PieceType::Rook,self.opposite)) {
+                if self.opposite == Color::White {
+                    if to==63 {self.r_white_castle=false}
+                    else if to==56 {self.l_white_castle=false}
+                }
+                else {
+                    if to==7 {self.l_black_castle=false}
+                    else if to==0 {self.r_black_castle=false}
+                }
+            }
+
+            self.board[to] = self.board[from];
+            self.board[from] = None;
+            self.next_turn();
+            Ok(())
+        }
+
+        else {
+            Err(Error::IllegalMove)
+        }
+        
+    }
+
+    // check legal moves for a piece
+    pub fn legal_moves(&self, position: usize) -> Vec<usize> {
+        let mut board = self.board;
+        let mut moves = vec![];
+        //if get_piece_at gives none then just return empty vector
+        //else piece and color are what we got from the function
+        let (piece, color) = match get_piece_at(&board, position) {
+            Some(tup) => tup,
+            None => return moves
+        };
+        // current position
+        let scol = position%8;
+        let srow = (position-(position%8))/8;
+        if color != self.turn {return moves}
+
+        match color { // divide up to if its a black or white piece
+            Color::Black => { 
+                match piece { // for each piece it has different possible moves
+                    PieceType::Rook => {
+                        if position%8!=7 { // go left (right)
+                            for i in position+1..(srow+1)*8 {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }
+                                
+                            }
+                        }
+                        // go right (left)
+                        if position%8!=0 {
+                            for i in (srow*8..=position-1).rev() {                       
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }                           
+                            }
+                        }
+                        // go fram (ner)
+                        if position<56 {
+                            for i in (position+8..64).step_by(8) {                           
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }
+                            }
+                        }
+                        // go bak (upp)
+                        if position>7 {
+                            for i in (scol..=position-8).rev().step_by(8) {                         
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }
+                            }
+                        }
+                    },
+                    PieceType::Knight => { 
+                        // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
+                        // as long as it will not go outside the &board and the piece there is not black it can go there
+                        // DDL
+                        
+                        if position>15 && position%8!=7 && !matches! (get_piece_at(&board, position-15),Some((_,Color::Black))) {                      
+                            if is_move_legal(&mut board, position,position-15,Color::Black,Color::White)==true {
+                                moves.push(position-15)   
+                            }
+                        }
+                        // DDR
+                        if position>16 && position%8!=0 && !matches! (get_piece_at(&board, position-17),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position-17,Color::Black,Color::White)==true {
+                                moves.push(position-17)
+                            }
+                        }
+                        // DLL
+                        if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position-6),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position-6,Color::Black,Color::White)==true {
+                                moves.push(position-6)
+                            }
+                        }
+                        // DRR
+                        if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position-10),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position-10,Color::Black,Color::White)==true {
+                                moves.push(position-10)
+                            }
+                        }
+
+                        // UUL
+                        if position<47 && position%8!=7 && !matches! (get_piece_at(&board, position+17),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position+17,Color::Black,Color::White)==true {
+                                moves.push(position+17)
+                            }
+                        }
+                        // UUR
+                        if position<48 && position%8!=0 && !matches! (get_piece_at(&board, position+15),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position+15,Color::Black,Color::White)==true {
+                                moves.push(position+15)
+                            }
+                        }
+                        // ULL
+                        if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position+10),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position+10,Color::Black,Color::White)==true {
+                                moves.push(position+10)
+                            }
+                        }
+                        // URR
+                        if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position+6),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position+6,Color::Black,Color::White)==true {
+                                moves.push(position+6)
+                            }
+                        }
+                    },
+                    PieceType::Bishop => {
+                        // go LU
+                        if position<55 && position%8!=7 {
+                            for i in (position+9..64).step_by(9) {
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                // usize cant be negative
+                                if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go RU
+                        if position<56 && position%8!=0 {
+                            for i in (position+7..64).step_by(7) {                          
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go LD
+                        if position>7 && position%8!=7 {
+                            for j in (7..50).step_by(7) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }                           
+                            }
+                        }
+                        // go RD
+                        if position>8 && position%8!=0 {
+                            for j in (9..64).step_by(9) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                    },
+                    PieceType::Queen => {
+                        // queen is basically rook and bishop
+
+                        // rook
+                        if position%8!=7 { // go left (right)
+                            for i in position+1..(srow+1)*8 {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }
+                                
+                            }
+                        }
+                        // go right (left)
+                        if position%8!=0 {
+                            for i in (srow*8..=position-1).rev() {                       
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }                           
+                            }
+                        }
+                        // go fram (ner)
+                        if position<56 {
+                            for i in (position+8..64).step_by(8) {                           
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }
+                            }
+                        }
+                        // go bak (upp)
+                        if position>7 {
+                            for i in (scol..=position-8).rev().step_by(8) {                         
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => {break}
+                                }
+                            }
+                        }
+                        
+                        // bishop
+                        // go LU
+                        if position<55 && position%8!=7 {
+                            for i in (position+9..64).step_by(9) {
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                // usize cant be negative
+                                if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go RU
+                        if position<56 && position%8!=0 {
+                            for i in (position+7..64).step_by(7) {                          
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go LD
+                        if position>7 && position%8!=7 {
+                            for j in (7..50).step_by(7) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }                           
+                            }
+                        }
+                        // go RD
+                        if position>8 && position%8!=0 {
+                            for j in (9..64).step_by(9) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::Black)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                    },
+                    PieceType::King => {
+                        // castling
+                        if self.l_black_castle && get_piece_at(&board, 5)==None && get_piece_at(&board, 6)==None {
+                            // cannot be checked before, during, after move
+                            if king_in_check(&board, Color::Black,Color::White)==Some(false) && is_move_legal(&mut board, position,5,Color::Black,Color::White) && is_move_legal(&mut board, position,6,Color::Black,Color::White) {
+                                moves.push(6)
+                            }
+                        }
+                        if self.r_black_castle && get_piece_at(&board, 3)==None && get_piece_at(&board, 2)==None && get_piece_at(&board, 1)==None {
+                            if king_in_check(&board, Color::Black,Color::White)==Some(false) && is_move_legal(&mut board, position,3,Color::Black,Color::White) && is_move_legal(&mut board, position,2,Color::Black,Color::White) {
+                                moves.push(2)
+                            }
+                        }
+
+                        // go bak
+                        if position>=8 {
+                            if is_move_legal(&mut board, position,position-8,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position-8) {
+                                    // if there is no piece or a white piece then it can go there
+                                    None | Some((_,Color::White)) => moves.push(position-8),
+                                    _ => {} // everything else, so basically when color is black
+                                }
+                            }
+                        }
+                        // go fram
+                        if position<=55 {
+                            if is_move_legal(&mut board, position,position+8,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position+8) {
+                                    None | Some((_,Color::White)) => moves.push(position+8),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // go right(left)
+                        if position%8!=0 {
+                            if is_move_legal(&mut board, position,position-1,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position-1) {
+                                    None | Some((_,Color::White)) => moves.push(position-1),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // go left(right)
+                        if position%8!=7 {
+                            if is_move_legal(&mut board, position,position+1,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position+1) {
+                                    None | Some((_,Color::White)) => moves.push(position+1),
+                                    _ => {} 
+                                }
+                            }
+                        }
+
+                        // bak vänster
+                        if position>7&&position%8!=7 {
+                            if is_move_legal(&mut board, position,position-7,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position-7) {
+                                    None | Some((_,Color::White)) => moves.push(position-7),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // bak höger
+                        if position>7&&position%8!=0 {
+                            if is_move_legal(&mut board, position,position-9,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position-9) {
+                                    None | Some((_,Color::White)) => moves.push(position-9),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // fram vänster
+                        if position<56&&position%8!=7 {
+                            if is_move_legal(&mut board, position,position+9,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position+9) {
+                                    None | Some((_,Color::White)) => moves.push(position+9),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // fram höger
+                        if position<56&&position%8!=0 {
+                            if is_move_legal(&mut board, position,position+7,Color::Black,Color::White)==true {
+                                match get_piece_at(&board, position+7) {
+                                    None | Some((_,Color::White)) => moves.push(position+7),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                    },
+                    PieceType::Pawn => {
+                        // two step
+                        if (position>7&&position<16) && get_piece_at(&board, position+8).is_none() && get_piece_at(&board, position+16).is_none() {
+                            if is_move_legal(&mut board, position,position+16,Color::Black,Color::White)==true {
+                                moves.push(position+16)
+                            }
+                        }
+                        // one step
+                        if position<56 && get_piece_at(&board, position+8).is_none() {
+                            if is_move_legal(&mut board, position,position+8,Color::Black,Color::White)==true {
+                                moves.push(position+8)
+                            }
+                        }
+
+                        // take another piece, left
+                        if position<56 && position%8!=7 && matches!(get_piece_at(&board, position+9),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position+9,Color::Black,Color::White)==true {
+                                moves.push(position+9)
+                            }
+                        }
+                        // take another piece, right
+                        if position<56 && position%8!=0 && matches!(get_piece_at(&board, position+7),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position+7,Color::Black,Color::White)==true {
+                                moves.push(position+7)
+                            }
+                        }
+                    }
+                }
+            }
+            Color::White => {
+                match piece { // for each piece it has different possible moves
+                    PieceType::Rook => {
+                        // go right
+                        if position%8!=7 {
+                            for i in position+1..(srow+1)*8 {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                        // go left
+                        if position%8!=0 {
+                            for i in (srow*8..=position-1).rev() {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                        // go ner
+                        if position<56 {
+                            for i in (position+8..64).step_by(8) {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                        // go upp
+                        if position>7 {
+                            for i in (scol..=position-8).rev().step_by(8) {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                    },
+                    PieceType::Knight => { 
+                        // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
+                        // as long as it will not go outside the &board and the piece there is not white it can go there
+                        // UUR
+                        if position>15 && position%8!=7 && !matches! (get_piece_at(&board, position-15),Some((_,Color::White))) {                      
+                            if is_move_legal(&mut board, position,position-15,Color::White,Color::Black)==true {
+                                moves.push(position-15)   
+                            }
+                        }
+                        // UUL
+                        if position>16 && position%8!=0 && !matches! (get_piece_at(&board, position-17),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position-17,Color::White,Color::Black)==true {   
+                                moves.push(position-17)
+                            }
+                        }
+                        // URR
+                        if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position-6),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position-6,Color::White,Color::Black)==true {
+                                moves.push(position-6)
+                            }
+                        }
+                        // ULL
+                        if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position-10),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position-10,Color::White,Color::Black)==true {
+                                moves.push(position-10)
+                            }
+                        }
+
+                        // DDR
+                        if position<47 && position%8!=7 && !matches! (get_piece_at(&board, position+17),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position+17,Color::White,Color::Black)==true {
+                                moves.push(position+17)
+                            }
+                        }
+                        // DDL
+                        if position<48 && position%8!=0 && !matches! (get_piece_at(&board, position+15),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position+15,Color::White,Color::Black)==true {
+                                moves.push(position+15)
+                            }
+                        }
+                        // DRR
+                        if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position+10),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position+10,Color::White,Color::Black)==true {    
+                                moves.push(position+10)
+                            }
+                        }
+                        // DLL
+                        if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position+6),Some((_,Color::White))) {
+                            if is_move_legal(&mut board, position,position+6,Color::White,Color::Black)==true {
+                                moves.push(position+6)
+                            }
+                        }
+                    },
+                    PieceType::Bishop => {
+                        // go RD
+                        if position<55 && position%8!=7 {
+                            for i in (position+9..64).step_by(9) {
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                // usize cant be negative
+                                if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go LD
+                        if position<56 && position%8!=0 {
+                            for i in (position+7..64).step_by(7) {
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go RU
+                        if position>7 && position%8!=7 {
+                            for j in (7..50).step_by(7) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go LU
+                        if position>8 && position%8!=0 {
+                            for j in (9..64).step_by(9) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                    },
+                    PieceType::Queen => {
+                        // queen is basically rook and bishop
+
+                        // rook
+                        // go right
+                        if position%8!=7 {
+                            for i in position+1..(srow+1)*8 {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                        // go left
+                        if position%8!=0 {
+                            for i in (srow*8..=position-1).rev() {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                        // go ner
+                        if position<56 {
+                            for i in (position+8..64).step_by(8) {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+                        // go upp
+                        if position>7 {
+                            for i in (scol..=position-8).rev().step_by(8) {
+                                match get_piece_at(&board, i) {
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => {break}
+                                }
+                            }
+                        }
+
+                        // bishop
+                        // go RD
+                        if position<55 && position%8!=7 {
+                            for i in (position+9..64).step_by(9) {
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                // usize cant be negative
+                                if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go LD
+                        if position<56 && position%8!=0 {
+                            for i in (position+7..64).step_by(7) {
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go RU
+                        if position>7 && position%8!=7 {
+                            for j in (7..50).step_by(7) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                        // go LU
+                        if position>8 && position%8!=0 {
+                            for j in (9..64).step_by(9) {
+                                if j>position {break}
+                                let i = position-j;
+                                let col = i%8;
+                                let row = (i-(i%8))/8;
+                                if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
+                                match get_piece_at(&board, i) {
+                                    Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
+                                    Some((_,Color::White)) => break,
+                                    None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
+                                }
+                            }
+                        }
+                    },
+                    PieceType::King => {
+                        // castling
+                        if self.r_white_castle && get_piece_at(&board, 61)==None && get_piece_at(&board, 62)==None {
+                            if king_in_check(&board, Color::White,Color::Black)==Some(false) && is_move_legal(&mut board, position,61,Color::White,Color::Black) && is_move_legal(&mut board, position,62,Color::White,Color::Black) {                            
+                                moves.push(62)
+                            }
+                        }
+                        if self.l_white_castle && get_piece_at(&board, 57)==None && get_piece_at(&board, 58)==None && get_piece_at(&board, 59)==None {
+                            if king_in_check(&board, Color::White,Color::Black)==Some(false) && is_move_legal(&mut board, position,59,Color::White,Color::Black) && is_move_legal(&mut board, position,58,Color::White,Color::Black) {
+                                moves.push(58)
+                            }
+                        }
+
+                        // go fram
+                        if position>=8 {
+                            if is_move_legal(&mut board, position,position-8,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position-8) {
+                                    // if there is no piece or a black piece then it can go there
+                                    None | Some((_,Color::Black)) => moves.push(position-8),
+                                    _ => {} // everything else, so basically when color is white
+                                }
+                            }
+                        }
+                        // go bak
+                        if position<=55 {
+                            if is_move_legal(&mut board, position,position+8,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position+8) {
+                                    None | Some((_,Color::Black)) => moves.push(position+8),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // go left
+                        if position%8!=0 {
+                            if is_move_legal(&mut board, position,position-1,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position-1) {
+                                    None | Some((_,Color::Black)) => moves.push(position-1),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // go right
+                        if position%8!=7 {
+                            if is_move_legal(&mut board, position,position+1,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position+1) {
+                                    None | Some((_,Color::Black)) => moves.push(position+1),
+                                    _ => {} 
+                                }
+                            }
+                        }
+
+                        // bak höger
+                        if position>7&&position%8!=7 {
+                            if is_move_legal(&mut board, position,position-7,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position-7) {
+                                    None | Some((_,Color::Black)) => moves.push(position-7),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // bak vänster
+                        if position>7&&position%8!=0 {
+                            if is_move_legal(&mut board, position,position-9,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position-9) {
+                                    None | Some((_,Color::Black)) => moves.push(position-9),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // fram höger
+                        if position<56&&position%8!=7 {
+                            if is_move_legal(&mut board, position,position+9,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position+9) {
+                                    None | Some((_,Color::Black)) => moves.push(position+9),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                        // fram vänster
+                        if position<56&&position%8!=0 {
+                            if is_move_legal(&mut board, position,position+7,Color::White,Color::Black)==true {
+                                match get_piece_at(&board, position+7) {
+                                    None | Some((_,Color::Black)) => moves.push(position+7),
+                                    _ => {} 
+                                }
+                            }
+                        }
+                    },
+                    PieceType::Pawn => {
+                        // two step
+                        if (position>47&&position<56) && get_piece_at(&board, position-8).is_none() && get_piece_at(&board, position-16).is_none() {
+                            if is_move_legal(&mut board, position,position-16,Color::White,Color::Black)==true {
+                                moves.push(position-16)
+                            }
+                        }
+                        // one step
+                        if position>7 && get_piece_at(&board, position-8).is_none() {
+                            if is_move_legal(&mut board, position,position-8,Color::White,Color::Black)==true {  
+                                moves.push(position-8)
+                            }
+                        }
+                        // take another piece, left
+                        if position>7 && position%8!=0 && matches!(get_piece_at(&board, position-9),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position-9,Color::White,Color::Black)==true {
+                                moves.push(position-9)
+                            }
+                        }
+                        // take another piece, right
+                        if position>7 && position%8!=7 && matches!(get_piece_at(&board, position-7),Some((_,Color::Black))) {
+                            if is_move_legal(&mut board, position,position-7,Color::White,Color::Black)==true {
+                                moves.push(position-7)
+                            }
+                        }
+                    }
+                }
+            }
+        
+        }
+        moves
     }
 
 }
@@ -294,759 +1132,7 @@ pub fn is_move_legal(board: &mut[Option<Piece>;64], from:usize, to:usize, my_col
 
 // return what the legal moves for a piece is
 // unsigned integer, dynamic, array indices is usize
-pub fn legal_moves(mut board: [Option<Piece>;64], position: usize) -> Vec<usize> {
-    let mut moves = vec![];
-    //if get_piece_at gives none then just return empty vector
-    //else piece and color are what we got from the function
-    let (piece, color) = match get_piece_at(&board, position) {
-        Some(tup) => tup,
-        None => return moves
-    };
-    // current position
-    let scol = position%8;
-    let srow = (position-(position%8))/8;
 
-    match color { // divide up to if its a black or white piece
-        Color::Black => { 
-            match piece { // for each piece it has different possible moves
-                PieceType::Rook => {
-                    if position%8!=7 { // go left (right)
-                        for i in position+1..(srow+1)*8 {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }
-                            
-                        }
-                    }
-                    // go right (left)
-                    if position%8!=0 {
-                        for i in (srow*8..=position-1).rev() {                       
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }                           
-                        }
-                    }
-                    // go fram (ner)
-                    if position<56 {
-                        for i in (position+8..64).step_by(8) {                           
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }
-                        }
-                    }
-                    // go bak (upp)
-                    if position>7 {
-                        for i in (scol..=position-8).rev().step_by(8) {                         
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }
-                        }
-                    }
-                },
-                PieceType::Knight => { 
-                    // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
-                    // as long as it will not go outside the &board and the piece there is not black it can go there
-                    // DDL
-                    
-                    if position>15 && position%8!=7 && !matches! (get_piece_at(&board, position-15),Some((_,Color::Black))) {                      
-                        if is_move_legal(&mut board, position,position-15,Color::Black,Color::White)==true {
-                            moves.push(position-15)   
-                        }
-                    }
-                    // DDR
-                    if position>16 && position%8!=0 && !matches! (get_piece_at(&board, position-17),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position-17,Color::Black,Color::White)==true {
-                            moves.push(position-17)
-                        }
-                    }
-                    // DLL
-                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position-6),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position-6,Color::Black,Color::White)==true {
-                            moves.push(position-6)
-                        }
-                    }
-                    // DRR
-                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position-10),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position-10,Color::Black,Color::White)==true {
-                            moves.push(position-10)
-                        }
-                    }
-
-                    // UUL
-                    if position<47 && position%8!=7 && !matches! (get_piece_at(&board, position+17),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position+17,Color::Black,Color::White)==true {
-                            moves.push(position+17)
-                        }
-                    }
-                    // UUR
-                    if position<48 && position%8!=0 && !matches! (get_piece_at(&board, position+15),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position+15,Color::Black,Color::White)==true {
-                            moves.push(position+15)
-                        }
-                    }
-                    // ULL
-                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position+10),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position+10,Color::Black,Color::White)==true {
-                            moves.push(position+10)
-                        }
-                    }
-                    // URR
-                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position+6),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position+6,Color::Black,Color::White)==true {
-                            moves.push(position+6)
-                        }
-                    }
-                },
-                PieceType::Bishop => {
-                    // go LU
-                    if position<55 && position%8!=7 {
-                        for i in (position+9..64).step_by(9) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            // usize cant be negative
-                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go RU
-                    if position<56 && position%8!=0 {
-                        for i in (position+7..64).step_by(7) {                          
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go LD
-                    if position>7 && position%8!=7 {
-                        for j in (7..50).step_by(7) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }                           
-                        }
-                    }
-                    // go RD
-                    if position>8 && position%8!=0 {
-                        for j in (9..64).step_by(9) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                },
-                PieceType::Queen => {
-                    // queen is basically rook and bishop
-
-                    // rook
-                    if position%8!=7 { // go left (right)
-                        for i in position+1..(srow+1)*8 {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }
-                            
-                        }
-                    }
-                    // go right (left)
-                    if position%8!=0 {
-                        for i in (srow*8..=position-1).rev() {                       
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true {moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }                           
-                        }
-                    }
-                    // go fram (ner)
-                    if position<56 {
-                        for i in (position+8..64).step_by(8) {                           
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }
-                        }
-                    }
-                    // go bak (upp)
-                    if position>7 {
-                        for i in (scol..=position-8).rev().step_by(8) {                         
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => {break}
-                            }
-                        }
-                    }
-                    
-                    // bishop
-                    // go LU
-                    if position<55 && position%8!=7 {
-                        for i in (position+9..64).step_by(9) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            // usize cant be negative
-                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go RU
-                    if position<56 && position%8!=0 {
-                        for i in (position+7..64).step_by(7) {                          
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go LD
-                    if position>7 && position%8!=7 {
-                        for j in (7..50).step_by(7) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }                           
-                        }
-                    }
-                    // go RD
-                    if position>8 && position%8!=0 {
-                        for j in (9..64).step_by(9) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::White)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::Black)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                },
-                PieceType::King => {
-                    // go bak
-                    if position>=8 {
-                        if is_move_legal(&mut board, position,position-8,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position-8) {
-                                // if there is no piece or a white piece then it can go there
-                                None | Some((_,Color::White)) => moves.push(position-8),
-                                _ => {} // everything else, so basically when color is black
-                            }
-                        }
-                    }
-                    // go fram
-                    if position<=55 {
-                        if is_move_legal(&mut board, position,position+8,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position+8) {
-                                None | Some((_,Color::White)) => moves.push(position+8),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // go right(left)
-                    if position%8!=0 {
-                        if is_move_legal(&mut board, position,position-1,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position-1) {
-                                None | Some((_,Color::White)) => moves.push(position-1),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // go left(right)
-                    if position%8!=7 {
-                        if is_move_legal(&mut board, position,position+1,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position+1) {
-                                None | Some((_,Color::White)) => moves.push(position+1),
-                                _ => {} 
-                            }
-                        }
-                    }
-
-                    // bak vänster
-                    if position>7&&position%8!=7 {
-                        if is_move_legal(&mut board, position,position-7,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position-7) {
-                                None | Some((_,Color::White)) => moves.push(position-7),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // bak höger
-                    if position>7&&position%8!=0 {
-                        if is_move_legal(&mut board, position,position-9,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position-9) {
-                                None | Some((_,Color::White)) => moves.push(position-9),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // fram vänster
-                    if position<56&&position%8!=7 {
-                        if is_move_legal(&mut board, position,position+9,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position+9) {
-                                None | Some((_,Color::White)) => moves.push(position+9),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // fram höger
-                    if position<56&&position%8!=0 {
-                        if is_move_legal(&mut board, position,position+7,Color::Black,Color::White)==true {
-                            match get_piece_at(&board, position+7) {
-                                None | Some((_,Color::White)) => moves.push(position+7),
-                                _ => {} 
-                            }
-                        }
-                    }
-                },
-                PieceType::Pawn => {
-                    // two step
-                    if (position>7&&position<16) && get_piece_at(&board, position+8).is_none() && get_piece_at(&board, position+16).is_none() {
-                        if is_move_legal(&mut board, position,position+16,Color::Black,Color::White)==true {
-                            moves.push(position+16)
-                        }
-                    }
-                    // one step
-                    if position<56 && get_piece_at(&board, position+8).is_none() {
-                        if is_move_legal(&mut board, position,position+8,Color::Black,Color::White)==true {
-                            moves.push(position+8)
-                        }
-                    }
-
-                    // take another piece, left
-                    if position<56 && position%8!=7 && matches!(get_piece_at(&board, position+9),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position+9,Color::Black,Color::White)==true {
-                            moves.push(position+9)
-                        }
-                    }
-                    // take another piece, right
-                    if position<56 && position%8!=0 && matches!(get_piece_at(&board, position+7),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position+7,Color::Black,Color::White)==true {
-                            moves.push(position+7)
-                        }
-                    }
-                }
-            }
-        }
-        Color::White => {
-            match piece { // for each piece it has different possible moves
-                PieceType::Rook => {
-                    // go right
-                    if position%8!=7 {
-                        for i in position+1..(srow+1)*8 {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                    // go left
-                    if position%8!=0 {
-                        for i in (srow*8..=position-1).rev() {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                    // go ner
-                    if position<56 {
-                        for i in (position+8..64).step_by(8) {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                    // go upp
-                    if position>7 {
-                        for i in (scol..=position-8).rev().step_by(8) {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                },
-                PieceType::Knight => { 
-                    // eight possible moves DDL,DDR,DLL,DRR,ULL,URR,UUL,UUR (Left,Right,Down,Up)
-                    // as long as it will not go outside the &board and the piece there is not white it can go there
-                    // UUR
-                    if position>15 && position%8!=7 && !matches! (get_piece_at(&board, position-15),Some((_,Color::White))) {                      
-                        if is_move_legal(&mut board, position,position-15,Color::White,Color::Black)==true {
-                            moves.push(position-15)   
-                        }
-                    }
-                    // UUL
-                    if position>16 && position%8!=0 && !matches! (get_piece_at(&board, position-17),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position-17,Color::White,Color::Black)==true {   
-                            moves.push(position-17)
-                        }
-                    }
-                    // URR
-                    if position>7 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position-6),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position-6,Color::White,Color::Black)==true {
-                            moves.push(position-6)
-                        }
-                    }
-                    // ULL
-                    if position>9 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position-10),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position-10,Color::White,Color::Black)==true {
-                            moves.push(position-10)
-                        }
-                    }
-
-                    // DDR
-                    if position<47 && position%8!=7 && !matches! (get_piece_at(&board, position+17),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position+17,Color::White,Color::Black)==true {
-                            moves.push(position+17)
-                        }
-                    }
-                    // DDL
-                    if position<48 && position%8!=0 && !matches! (get_piece_at(&board, position+15),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position+15,Color::White,Color::Black)==true {
-                            moves.push(position+15)
-                        }
-                    }
-                    // DRR
-                    if position<54 && position%8!=6 && position%8!=7 && !matches! (get_piece_at(&board, position+10),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position+10,Color::White,Color::Black)==true {    
-                            moves.push(position+10)
-                        }
-                    }
-                    // DLL
-                    if position<56 && position%8!=0 && position%8!=1 && !matches! (get_piece_at(&board, position+6),Some((_,Color::White))) {
-                        if is_move_legal(&mut board, position,position+6,Color::White,Color::Black)==true {
-                            moves.push(position+6)
-                        }
-                    }
-                },
-                PieceType::Bishop => {
-                    // go RD
-                    if position<55 && position%8!=7 {
-                        for i in (position+9..64).step_by(9) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            // usize cant be negative
-                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go LD
-                    if position<56 && position%8!=0 {
-                        for i in (position+7..64).step_by(7) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go RU
-                    if position>7 && position%8!=7 {
-                        for j in (7..50).step_by(7) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go LU
-                    if position>8 && position%8!=0 {
-                        for j in (9..64).step_by(9) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                },
-                PieceType::Queen => {
-                    // queen is basically rook and bishop
-
-                    // rook
-                    // go right
-                    if position%8!=7 {
-                        for i in position+1..(srow+1)*8 {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                    // go left
-                    if position%8!=0 {
-                        for i in (srow*8..=position-1).rev() {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                    // go ner
-                    if position<56 {
-                        for i in (position+8..64).step_by(8) {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-                    // go upp
-                    if position>7 {
-                        for i in (scol..=position-8).rev().step_by(8) {
-                            match get_piece_at(&board, i) {
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)},
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => {break}
-                            }
-                        }
-                    }
-
-                    // bishop
-                    // go RD
-                    if position<55 && position%8!=7 {
-                        for i in (position+9..64).step_by(9) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            // usize cant be negative
-                            if (col as isize - scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go LD
-                    if position<56 && position%8!=0 {
-                        for i in (position+7..64).step_by(7) {
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize -scol as isize).abs() != (row as isize - srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go RU
-                    if position>7 && position%8!=7 {
-                        for j in (7..50).step_by(7) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                    // go LU
-                    if position>8 && position%8!=0 {
-                        for j in (9..64).step_by(9) {
-                            if j>position {break}
-                            let i = position-j;
-                            let col = i%8;
-                            let row = (i-(i%8))/8;
-                            if (col as isize-scol as isize).abs() != (row as isize-srow as isize).abs() {break}
-                            match get_piece_at(&board, i) {
-                                Some((_,Color::Black)) => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i);break},
-                                Some((_,Color::White)) => break,
-                                None => if is_move_legal(&mut board, position,i,Color::Black,Color::White)==true{moves.push(i)}
-                            }
-                        }
-                    }
-                },
-                PieceType::King => {
-                    // go fram
-                    if position>=8 {
-                        if is_move_legal(&mut board, position,position-8,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position-8) {
-                                // if there is no piece or a black piece then it can go there
-                                None | Some((_,Color::Black)) => moves.push(position-8),
-                                _ => {} // everything else, so basically when color is white
-                            }
-                        }
-                    }
-                    // go bak
-                    if position<=55 {
-                        if is_move_legal(&mut board, position,position+8,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position+8) {
-                                None | Some((_,Color::Black)) => moves.push(position+8),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // go left
-                    if position%8!=0 {
-                        if is_move_legal(&mut board, position,position-1,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position-1) {
-                                None | Some((_,Color::Black)) => moves.push(position-1),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // go right
-                    if position%8!=7 {
-                        if is_move_legal(&mut board, position,position+1,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position+1) {
-                                None | Some((_,Color::Black)) => moves.push(position+1),
-                                _ => {} 
-                            }
-                        }
-                    }
-
-                    // bak höger
-                    if position>7&&position%8!=7 {
-                        if is_move_legal(&mut board, position,position-7,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position-7) {
-                                None | Some((_,Color::Black)) => moves.push(position-7),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // bak vänster
-                    if position>7&&position%8!=0 {
-                        if is_move_legal(&mut board, position,position-9,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position-9) {
-                                None | Some((_,Color::Black)) => moves.push(position-9),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // fram höger
-                    if position<56&&position%8!=7 {
-                        if is_move_legal(&mut board, position,position+9,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position+9) {
-                                None | Some((_,Color::Black)) => moves.push(position+9),
-                                _ => {} 
-                            }
-                        }
-                    }
-                    // fram vänster
-                    if position<56&&position%8!=0 {
-                        if is_move_legal(&mut board, position,position+7,Color::White,Color::Black)==true {
-                            match get_piece_at(&board, position+7) {
-                                None | Some((_,Color::Black)) => moves.push(position+7),
-                                _ => {} 
-                            }
-                        }
-                    }
-                },
-                PieceType::Pawn => {
-                    // two step
-                    if (position>47&&position<56) && get_piece_at(&board, position-8).is_none() && get_piece_at(&board, position-16).is_none() {
-                        if is_move_legal(&mut board, position,position-16,Color::White,Color::Black)==true {
-                            moves.push(position-16)
-                        }
-                    }
-                    // one step
-                    if position>7 && get_piece_at(&board, position-8).is_none() {
-                        if is_move_legal(&mut board, position,position-8,Color::White,Color::Black)==true {  
-                            moves.push(position-8)
-                        }
-                    }
-                    // take another piece, left
-                    if position>7 && position%8!=0 && matches!(get_piece_at(&board, position-9),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position-9,Color::White,Color::Black)==true {
-                            moves.push(position-9)
-                        }
-                    }
-                    // take another piece, right
-                    if position>7 && position%8!=7 && matches!(get_piece_at(&board, position-7),Some((_,Color::Black))) {
-                        if is_move_legal(&mut board, position,position-7,Color::White,Color::Black)==true {
-                            moves.push(position-7)
-                        }
-                    }
-                }
-            }
-        }
-    
-    }
-    return moves;
-}
-
-// move a piece from a square to another
-pub fn move_piece(from:usize, to:usize, board:&mut[Option<Piece>;64]) {
-    board[to] = board[from];
-    board[from] = None;
-}
 
 #[cfg(test)]
 mod tests {
@@ -1064,9 +1150,5 @@ mod tests {
         Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }),
         Some(Piece { piece_type: PieceType::Rook, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Queen, color: Color::White }), Some(Piece { piece_type: PieceType::King, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Rook, color: Color::White }), 
         ];
-        let res = get_piece_at(&chess_board, 15);
-        print!("{:?}",res);
-        let movee = legal_moves(chess_board,15);
-        print!("{:?}",movee)
     }
 }

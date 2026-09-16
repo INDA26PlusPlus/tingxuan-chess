@@ -2,7 +2,6 @@ Welcomee to my rust chess library
 
 let mut game = Chess::new()
 game.next_turn()
-game.current_turn()
 
 pub fn new_board() -> [Option<Piece>;64]
 pub fn get_piece_at(&board: &[Option<Piece>;64], position: usize) -> Option<(PieceType,Color)>
