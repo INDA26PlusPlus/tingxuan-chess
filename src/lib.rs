@@ -547,6 +547,28 @@ impl Chess {
         }
     }
 
+    pub fn print(&self) {
+        println!("+-------------------------------+");
+        for i in 0..64{
+            let mut p = ".";
+            if self.board[i]==Some(Piece { piece_type: PieceType::Rook, color: Color::Black }) {p="r"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Knight, color: Color::Black }) {p="n"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }) {p="b"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Queen, color: Color::Black }) {p="q"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::King, color: Color::Black }) {p="k"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }) {p="p"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Rook, color: Color::White }) {p="R"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Knight, color: Color::White }) {p="N"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Bishop, color: Color::White }) {p="B"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Queen, color: Color::White }) {p="Q"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::King, color: Color::White }) {p="K"}
+            else if self.board[i]==Some(Piece { piece_type: PieceType::Pawn, color: Color::White }) {p="P"}
+            
+            if i%8==7 {println!("| {p} |")}
+            else {print!("| {p} ")}
+        }
+        println!("+-------------------------------+");
+    }
 }
 
 // new chess board 
