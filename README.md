@@ -71,7 +71,8 @@ returns a vector containing square index of all possible moves
 check the game status right now
 
 ### -`instance.print()`-
-print an ascii representation of the board, the one to the right above 
+print an ascii representation of the board, the one to the right above \
+good for debugging!
 
 ## Types
 public enums
