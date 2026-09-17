@@ -15,9 +15,18 @@ pub enum Color { // white or black pieces
 }
 
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
-pub enum Error { // white or black pieces
+pub enum Error { 
     IllegalMove,
     OutOfBound,
+    IllegalPromotion,
+}
+
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub enum GameStatus { 
+    Ongoing,
+    Checkmate,
+    Stalemate,
+    Check
 }
 
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
@@ -28,8 +37,8 @@ pub struct Piece {
 
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
 pub struct Chess {
-    board: [Option<Piece>;64],
-    turn: Color,
+    pub board: [Option<Piece>;64],
+    pub turn: Color,
     opposite: Color,
     // if castling has happened
     r_white_castle: bool,
@@ -66,12 +75,13 @@ impl Chess {
         }
     }
     
-    // move a piece from a square to another
-    pub fn move_piece(&mut self, from:usize, to:usize) -> Result<(), Error>{
+    // move a piece from a square to another, paramters are: from, to, and promotion if relevant
+    pub fn move_piece(&mut self, from:usize, to:usize, promotion:Option<PieceType>) -> Result<(), Error>{
         // check so this is a legal move
         if self.legal_moves(from).contains(&to)  {
             // if the piece moved is a king or rook then castling cannot happen anymore, or castling happen
-            if get_piece_at(&self.board, from) == Some((PieceType::King,self.turn)) {
+            let square = get_piece_at(&self.board, from);
+            if square == Some((PieceType::King,self.turn)) {
                 if from==60 && to==62 {
                     self.board[61] = self.board[63];
                     self.board[63] = None;
@@ -111,7 +121,7 @@ impl Chess {
             }
 
             // if a pawn moves two steps
-            if get_piece_at(&self.board, from) == Some((PieceType::Pawn,self.turn)) && (to==from+16 || to==from-16) {
+            if square == Some((PieceType::Pawn,self.turn)) && (to==from+16 || to==from-16) {
                 self.en_passant = Some(to)
             }
             else {
@@ -119,7 +129,7 @@ impl Chess {
             }
             
             // en pasant
-            if get_piece_at(&self.board, from) == Some((PieceType::Pawn,self.turn)) && (to==from-7 || to==from-9 || to==from+9 || to==from+7) && get_piece_at(&self.board, to)==None {
+            if square == Some((PieceType::Pawn,self.turn)) && (to==from-7 || to==from-9 || to==from+9 || to==from+7) && get_piece_at(&self.board, to)==None {
                 // test the moves on a copy first
                 let mut copy = self.board;
                 copy[to] = copy[from];
@@ -136,12 +146,38 @@ impl Chess {
                     self.next_turn();
                     return Ok(());
                 }
-        }
+            }
+            
+            // promotion
+            if square == Some((PieceType::Pawn,self.turn)) && ((from>=8 && from<=15 && to<=7) || (from>=48 && from<=55 && to >=56 && to <= 63)) {
+                if promotion == Some(PieceType::Bishop) || promotion == Some(PieceType::Queen) || promotion == Some(PieceType::Knight) || promotion == Some(PieceType::Rook) {
+                    // if white promotion
+                    if from>=8 && from<=15 && to<=7 {
+                        self.board[from] = None;
+                        self.board[to] = Some(Piece { piece_type: promotion.unwrap(), color: Color::White });
+                    }
+                    // if black promotion
+                    else if from>=48 && from<=55 && to >=56 && to <= 63 {
+                        self.board[from] = None;
+                        self.board[to] = Some(Piece { piece_type: promotion.unwrap(), color: Color::Black });
+                    }
+                    else {
+                        return Err(Error::IllegalPromotion);
+                    }
+                    self.next_turn();
+                    return Ok(());
+                }
+                else {
+                    return Err(Error::IllegalPromotion);
+                }
+            }
+            
         
-        self.board[to] = self.board[from];
-        self.board[from] = None;
-        self.next_turn();
-        Ok(())
+            self.board[to] = self.board[from];
+            self.board[from] = None;
+            self.next_turn();
+            Ok(())
+
         }
 
         else {
@@ -946,6 +982,24 @@ impl Chess {
         moves
     }
 
+    pub fn game_status(&self) -> GameStatus {
+        for i in 0..64 {
+            if let Some((_,color)) = get_piece_at(&self.board, i) {
+                if color==self.turn && !self.legal_moves(i).is_empty() {
+                    if king_in_check(&self.board,self.turn,self.opposite)==Some(true){return GameStatus::Check}
+                    else {return GameStatus::Ongoing}
+                }
+            }  
+        }
+        if king_in_check(&self.board,self.turn,self.opposite)!=Some(true) {
+            return GameStatus::Stalemate;
+        }
+        else if king_in_check(&self.board,self.turn,self.opposite)==Some(true) {
+            return GameStatus::Checkmate
+        }
+        return GameStatus::Ongoing;
+    }
+    
 }
 
 // new chess board 
@@ -1177,7 +1231,6 @@ pub fn is_move_legal(board: &mut[Option<Piece>;64], from:usize, to:usize, my_col
         return true
     }
 }
-
 // return what the legal moves for a piece is
 // unsigned integer, dynamic, array indices is usize
 
