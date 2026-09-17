@@ -31,21 +31,21 @@ pub enum GameStatus {
 
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
 pub struct Piece { 
-    piece_type: PieceType,
-    color: Color,
+    pub piece_type: PieceType,
+    pub color: Color,
 }
 
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
 pub struct Chess {
     pub board: [Option<Piece>;64],
     pub turn: Color,
-    opposite: Color,
+    pub opposite: Color,
     // if castling has happened
-    r_white_castle: bool,
-    l_white_castle: bool,
-    r_black_castle: bool,
-    l_black_castle: bool,
-    en_passant: Option<usize>,
+    pub r_white_castle: bool,
+    pub l_white_castle: bool,
+    pub r_black_castle: bool,
+    pub l_black_castle: bool,
+    pub en_passant: Option<usize>,
 }
 
 impl Chess {
@@ -84,8 +84,17 @@ impl Chess {
         
         // check so this is a legal move
         if self.legal_moves(from).contains(&to)  {
-            // if the piece moved is a king or rook then castling cannot happen anymore, or castling happen
             let square = get_piece_at(&self.board, from);
+
+            // check so promotion is legal before checking castling
+            if square == Some((PieceType::Pawn,self.turn)) && ((from>=8 && from<=15 && to<=7) || (from>=48 && from<=55 && to >=56 && to <= 63)) {
+                match promotion {
+                    Some(PieceType::Bishop) | Some(PieceType::Queen) | Some(PieceType::Knight) | Some(PieceType::Rook) => {},
+                    _ => {return Err(Error::IllegalPromotion)}
+                } 
+            }
+
+            // castling
             if square == Some((PieceType::King,self.turn)) {
                 // moves the rook, king is moved further down
                 if from==60 && to==62 {
@@ -161,9 +170,6 @@ impl Chess {
                     }
                     self.next_turn();
                     return Ok(());
-                }
-                else {
-                    return Err(Error::IllegalPromotion);
                 }
             }
         
@@ -293,7 +299,7 @@ impl Chess {
                             // if there is no piece or a black piece then it can go there
                             None => moves.push(position-8),
                             Some((_,color)) => if color==self.opposite {moves.push(position-8)},
-                            _ => {} // everything else, so basically when color is white
+                            // when color is white nothing happens
                         }
                     }
                 }
@@ -302,7 +308,6 @@ impl Chess {
                         match get_piece_at(&board, position+8) {
                             None => moves.push(position+8), 
                             Some((_,color)) => if color==self.opposite {moves.push(position+8)},
-                            _ => {} 
                         }
                     }
                 }
@@ -311,7 +316,6 @@ impl Chess {
                         match get_piece_at(&board, position-1) {
                             None => moves.push(position-1), 
                             Some((_,color)) => if color==self.opposite {moves.push(position-1)},
-                            _ => {} 
                         }
                     }
                 }
@@ -320,7 +324,6 @@ impl Chess {
                         match get_piece_at(&board, position+1) {
                             None => moves.push(position+1), 
                             Some((_,color)) => if color==self.opposite {moves.push(position+1)},
-                            _ => {} 
                         }
                     }
                 }
@@ -330,7 +333,6 @@ impl Chess {
                         match get_piece_at(&board, position-7) {
                             None => moves.push(position-7), 
                             Some((_,color)) => if color==self.opposite {moves.push(position-7)},
-                            _ => {} 
                         }
                     }
                 }
@@ -339,7 +341,6 @@ impl Chess {
                         match get_piece_at(&board, position-9) {
                             None => moves.push(position-9), 
                             Some((_,color)) => if color==self.opposite {moves.push(position-9)},
-                            _ => {} 
                         }
                     }
                 }
@@ -348,7 +349,6 @@ impl Chess {
                         match get_piece_at(&board, position+9) {
                             None => moves.push(position+9), 
                             Some((_,color)) => if color==self.opposite {moves.push(position+9)},
-                            _ => {} 
                         }
                     }
                 }
@@ -357,7 +357,6 @@ impl Chess {
                         match get_piece_at(&board, position+7) {
                             None => moves.push(position+7), 
                             Some((_,color)) => if color==self.opposite {moves.push(position+7)},
-                            _ => {} 
                         }
                     }
                 }
@@ -390,7 +389,7 @@ impl Chess {
                     }
                 }
                 if position>7 && position%8!=7 { // go RU
-                    for i in ((position-7..=position-(7-scol).min(srow)*7)).rev().step_by(7) {
+                    for i in ((position-(7-scol).min(srow)*7..=position-7)).rev().step_by(7) {
                         match get_piece_at(&board, i) {
                             Some((_,color)) => {
                                 if color==self.opposite && is_move_legal(&mut board, position,i,self.turn,self.opposite)==true{moves.push(i)};
@@ -400,9 +399,8 @@ impl Chess {
                         }
                     }
                 }
-                // go LU
                 if position>8 && position%8!=0 { // go LU
-                    for i in ((position-9..=position-(scol).min(srow)*9)).rev().step_by(9) {
+                    for i in ((position-(scol).min(srow)*9..=position-9)).rev().step_by(9) {
                         match get_piece_at(&board, i) {
                             Some((_,color)) => {
                                 if color==self.opposite && is_move_legal(&mut board, position,i,self.turn,self.opposite)==true{moves.push(i)};
@@ -555,7 +553,7 @@ impl Chess {
 fn new_board() -> [Option<Piece>;64] {
     // &board is 1d array, initialize with the chess piece else None in squares
     // Some() so Option know it is not None, but Some
-    let mut board: [Option<Piece>; 64] = [
+    let board: [Option<Piece>; 64] = [
     Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Queen, color: Color::Black }), Some(Piece { piece_type: PieceType::King, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), 
     Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), 
     None, None, None, None, None, None, None, None, 
@@ -816,23 +814,3 @@ fn is_move_legal(board: &mut[Option<Piece>;64], from:usize, to:usize, my_color: 
     }
 }
 // unsigned integer, dynamic, array indices is usize
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test(){
-        let mut chess_board: [Option<Piece>; 64] = [
-        Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Queen, color: Color::Black }), Some(Piece { piece_type: PieceType::King, color: Color::Black }), Some(Piece { piece_type: PieceType::Bishop, color: Color::Black }), Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), Some(Piece { piece_type: PieceType::Rook, color: Color::Black }), 
-        Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), Some(Piece { piece_type: PieceType::Pawn, color: Color::Black }), 
-        Some(Piece { piece_type: PieceType::Knight, color: Color::Black }), None, None, None, None, None, None, None, 
-        None, None, None, None, None, None, None, None, 
-        None, None, None, None, None, None, None, None, 
-        None, None, None, None, None, None, None, None, 
-        Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }), Some(Piece { piece_type: PieceType::Pawn, color: Color::White }),
-        Some(Piece { piece_type: PieceType::Rook, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Queen, color: Color::White }), Some(Piece { piece_type: PieceType::King, color: Color::White }), Some(Piece { piece_type: PieceType::Bishop, color: Color::White }), Some(Piece { piece_type: PieceType::Knight, color: Color::White }), Some(Piece { piece_type: PieceType::Rook, color: Color::White }), 
-        ];
-    }
-}
