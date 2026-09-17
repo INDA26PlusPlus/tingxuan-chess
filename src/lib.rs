@@ -69,7 +69,7 @@ impl Chess {
     // move a piece from a square to another
     pub fn move_piece(&mut self, from:usize, to:usize) -> Result<(), Error>{
         // check so this is a legal move
-        if is_move_legal(&mut self.board,from,to,self.turn,self.opposite)==true && self.legal_moves(from).contains(&to)  {
+        if self.legal_moves(from).contains(&to)  {
             // if the piece moved is a king or rook then castling cannot happen anymore, or castling happen
             if get_piece_at(&self.board, from) == Some((PieceType::King,self.turn)) {
                 if from==60 && to==62 {
@@ -110,10 +110,38 @@ impl Chess {
                 }
             }
 
-            self.board[to] = self.board[from];
-            self.board[from] = None;
-            self.next_turn();
-            Ok(())
+            // if a pawn moves two steps
+            if get_piece_at(&self.board, from) == Some((PieceType::Pawn,self.turn)) && (to==from+16 || to==from-16) {
+                self.en_passant = Some(to)
+            }
+            else {
+                self.en_passant = None
+            }
+            
+            // en pasant
+            if get_piece_at(&self.board, from) == Some((PieceType::Pawn,self.turn)) && (to==from-7 || to==from-9 || to==from+9 || to==from+7) && get_piece_at(&self.board, to)==None {
+                // test the moves on a copy first
+                let mut copy = self.board;
+                copy[to] = copy[from];
+                copy[from] = None;
+                if to==from-7 || to==from+9 {copy[from+1]=None}
+                else if to==from-9 || to==from+7 {copy[from-1]=None}
+
+                // after moved piece, if king in check then illegal move
+                if king_in_check(&copy, self.turn, self.opposite)==Some(true) {
+                    return Err(Error::IllegalMove);
+                }
+                else {
+                    self.board = copy;
+                    self.next_turn();
+                    return Ok(());
+                }
+        }
+        
+        self.board[to] = self.board[from];
+        self.board[from] = None;
+        self.next_turn();
+        Ok(())
         }
 
         else {
@@ -489,6 +517,16 @@ impl Chess {
                         }
                     },
                     PieceType::Pawn => {
+                        // en passant
+                        if srow==4 && self.en_passant != None && (self.en_passant.unwrap()==position-1 || self.en_passant.unwrap()==position+1) {
+                            if self.en_passant.unwrap()==position-1 && is_move_legal(&mut board, position,position+7,Color::Black,Color::White) {
+                                if get_piece_at(&board, position+7).is_none(){moves.push(position+7)} 
+                            }
+                            else if self.en_passant.unwrap()==position+1 && is_move_legal(&mut board, position,position+9,Color::Black,Color::White) {
+                                if get_piece_at(&board, position+9).is_none(){moves.push(position+9)} 
+                            }
+                        }
+
                         // two step
                         if (position>7&&position<16) && get_piece_at(&board, position+8).is_none() && get_piece_at(&board, position+16).is_none() {
                             if is_move_legal(&mut board, position,position+16,Color::Black,Color::White)==true {
@@ -866,6 +904,16 @@ impl Chess {
                         }
                     },
                     PieceType::Pawn => {
+                        // en passant
+                        if srow==3 && self.en_passant != None && (self.en_passant.unwrap()==position-1 || self.en_passant.unwrap()==position+1) {
+                            if self.en_passant.unwrap()==position-1 && is_move_legal(&mut board, position,position-9,Color::White,Color::Black) {
+                                if get_piece_at(&board, position-9).is_none(){moves.push(position-9)} 
+                            }
+                            else if self.en_passant.unwrap()==position+1 && is_move_legal(&mut board, position,position-7,Color::White,Color::Black) {
+                                if get_piece_at(&board, position-7).is_none(){moves.push(position-7)} 
+                            }
+                        }
+
                         // two step
                         if (position>47&&position<56) && get_piece_at(&board, position-8).is_none() && get_piece_at(&board, position-16).is_none() {
                             if is_move_legal(&mut board, position,position-16,Color::White,Color::Black)==true {
