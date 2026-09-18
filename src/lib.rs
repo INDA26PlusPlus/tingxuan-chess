@@ -147,7 +147,8 @@ impl Chess {
             if square == Some((PieceType::Pawn,self.turn)) && (from>=7 && to==from-7 || from>=9 && to==from-9 || to==from+9 || to==from+7) && get_piece_at(&self.board, to)==None {
                 self.board[to]=self.board[from];
                 self.board[from]=None;
-                self.board[to-8]=None;
+                if self.turn == Color::White {self.board[to+8]=None;}
+                else {self.board[to-8]=None;}
                 self.next_turn();
                 return Ok(());
             }
@@ -419,13 +420,13 @@ impl Chess {
                 match piece { 
                     PieceType::King => {
                         // castling
-                        if self.l_black_castle && get_piece_at(&board, 5)==None && get_piece_at(&board, 6)==None {
+                        if position==4 && self.l_black_castle && get_piece_at(&board, 5)==None && get_piece_at(&board, 6)==None {
                             // cannot be checked before, during, after move
                             if king_in_check(&board, Color::Black,Color::White)==Some(false) && is_move_legal(&mut board, position,5,Color::Black,Color::White) && is_move_legal(&mut board, position,6,Color::Black,Color::White) {
                                 moves.push(6)
                             }
                         }
-                        if self.r_black_castle && get_piece_at(&board, 3)==None && get_piece_at(&board, 2)==None && get_piece_at(&board, 1)==None {
+                        if position==4 && self.r_black_castle && get_piece_at(&board, 3)==None && get_piece_at(&board, 2)==None && get_piece_at(&board, 1)==None {
                             if king_in_check(&board, Color::Black,Color::White)==Some(false) && is_move_legal(&mut board, position,3,Color::Black,Color::White) && is_move_legal(&mut board, position,2,Color::Black,Color::White) {
                                 moves.push(2)
                             }
@@ -475,12 +476,12 @@ impl Chess {
                 match piece { // for each piece it has different possible moves
                     PieceType::King => {
                         // castling
-                        if self.r_white_castle && get_piece_at(&board, 61)==None && get_piece_at(&board, 62)==None {
+                        if position==60 && self.r_white_castle && get_piece_at(&board, 61)==None && get_piece_at(&board, 62)==None {
                             if king_in_check(&board, Color::White,Color::Black)==Some(false) && is_move_legal(&mut board, position,61,Color::White,Color::Black) && is_move_legal(&mut board, position,62,Color::White,Color::Black) {                            
                                 moves.push(62)
                             }
                         }
-                        if self.l_white_castle && get_piece_at(&board, 57)==None && get_piece_at(&board, 58)==None && get_piece_at(&board, 59)==None {
+                        if position==60 && self.l_white_castle && get_piece_at(&board, 57)==None && get_piece_at(&board, 58)==None && get_piece_at(&board, 59)==None {
                             if king_in_check(&board, Color::White,Color::Black)==Some(false) && is_move_legal(&mut board, position,59,Color::White,Color::Black) && is_move_legal(&mut board, position,58,Color::White,Color::Black) {
                                 moves.push(58)
                             }

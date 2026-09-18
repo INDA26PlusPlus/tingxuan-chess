@@ -13,12 +13,13 @@ chessy = {git = "https://github.com/INDA26PlusPlus/tingxuan-chess"}
 
 ## Quickstart
 ```rs
-use chessy::{Chess, PieceType};
+use chessy::*;
 
 fn main() {
     // creates a new game with the standard starting board
     let mut game = Chess::new();
-
+    game.print();
+    
     // get all legal moves the piece at square 12 is able to make
     let moves = game.legal_moves(12);
     println!("{:?}", moves);
