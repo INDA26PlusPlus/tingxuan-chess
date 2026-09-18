@@ -531,6 +531,7 @@ impl Chess {
         moves
     }
 
+    // function to get what the current game status is
     pub fn game_status(&self) -> GameStatus {
         for i in 0..64 {
             if let Some((_,color)) = get_piece_at(&self.board, i) {
@@ -548,6 +549,7 @@ impl Chess {
         }
     }
 
+    // print the board
     pub fn print(&self) {
         println!("+-------------------------------+");
         for i in 0..64{
@@ -590,7 +592,7 @@ fn new_board() -> [Option<Piece>;64] {
     return board
 }
 
-// get what chess piece is at a position, return tuple with what piece type and the color
+// get what piece is at a square, return tuple with what piece type and the color
 fn get_piece_at(board: &[Option<Piece>;64], position: usize) -> Option<(PieceType,Color)> {
     if board[position].is_none() {
         return None;

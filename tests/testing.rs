@@ -158,9 +158,22 @@ mod tests {
         assert_eq!(game.board[26],None);
     }
     
-    // En passant:
+    #[test]
+    fn promotion_check() {
+        let mut game = empty_game();
 
-// Rätt bricka tas bort (raden bakom to).
+        // promote while resolve check
+        game.board[3] = Some(Piece { piece_type: PieceType::King, color: Color::White });
+        game.board[0] = Some(Piece { piece_type: PieceType::Rook, color: Color::Black }); 
+        game.board[9] = Some(Piece { piece_type: PieceType::Pawn, color: Color::White });
+        assert_eq!(sorted(game.legal_moves(9)),sorted(vec![0,1]));
+        game.move_piece(9, 0, Some(PieceType::Knight));
+        assert_eq!(game.board[0],Some(Piece { piece_type: PieceType::Knight, color: Color::White }));
+
+        
+    }
+
+
     // println!("{:?}",game.legal_moves(14));
 
 
